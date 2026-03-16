@@ -1,6 +1,6 @@
-import { Node } from "../types/node";
+import { CreateCTNdodeInput, CTNode } from "../types/node";
 
-const nodes = new Map<string, Node>();
+const nodes = new Map<string, CTNode>();
 
 export function getNode(id: string) {
   if (!nodes.has(id)) {
@@ -9,9 +9,9 @@ export function getNode(id: string) {
   return nodes.get(id);
 }
 
-export function setNode(id: string, updatedNode: Node) {
+export function setNode(id: string, updatedNode: CTNode) {
   if (!nodes.has(id)) {
-    return undefined
+    return undefined;
   }
   nodes.set(id, updatedNode);
 }
@@ -28,7 +28,7 @@ export function getAllNodes() {
   return nodes;
 }
 
-export function createNode(data: Omit<Node, "id">) {
+export function createNode(data: CreateCTNdodeInput) {
   const newId = crypto.randomUUID();
   const newNode = {
     id: newId,

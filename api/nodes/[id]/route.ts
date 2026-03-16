@@ -1,4 +1,6 @@
-import { createNode, deleteNode, getNode, setNode } from "@/lib/db/nodes";
+import { deleteNode, getNode, setNode } from "@/lib/db/nodes";
+import { NodeSchema } from "@/lib/schemas/node";
+import { z } from "zod"
 
 export async function GET(
   request: Request,
@@ -46,14 +48,16 @@ export async function PUT(
   try {
     const body = await request.json();
 
-    if (!body.content) {
+    const validationResult = NodeSchema.safeParse(body)
+
+    if (!validationResult.success) {
       return Response.json(
-        { error: "Content field is required" },
+        { error: z.treeifyError(validationResult.error)},
         { status: 400 },
       );
     }
 
-    const node = setNode(params.id, body);
+    const node = setNode(params.id, validationResult.data);
 
     if (!node) {
       return Response.json(

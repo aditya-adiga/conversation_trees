@@ -1,8 +1,5 @@
-export type Node = {
-    id: string,
-    content: string,
-    summary: string,
-    parent: Node,
-    nextSibling: Node,
-    prevSibling: Node
-}
+import { z } from "zod";
+import { CreateNodeSchema, NodeSchema } from "../schemas/node";
+
+export type CTNode = z.infer<typeof NodeSchema>;
+export type CreateCTNdodeInput = z.infer<typeof CreateNodeSchema>;
