@@ -5,8 +5,21 @@ export const NodeSchema = z.object({
   content: z.string().min(1),
   summary: z.string().optional(),
   parentId: z.uuid().nullable(),
-  nextSibling: z.uuid(),
-  prevSibling: z.uuid(),
+  nextSiblingId: z.uuid().nullable().default(null),
+  prevSiblingId: z.uuid().nullable(),
+  firstChildId: z.uuid().nullable().default(null),
+  lastChildId: z.uuid().nullable(),
 });
 
-export const CreateNodeSchema = NodeSchema.omit({ id: true });
+export const CreateNodeSchema = NodeSchema.omit({
+  id: true,
+});
+
+export const ClientNodeSchema = NodeSchema.omit({
+  id: true,
+  summary: true,
+  nextSiblingId: true,
+  prevSiblingId: true,
+  firstChildId: true,
+  lastChildId: true,
+});
