@@ -3,17 +3,26 @@ import { NodeSchema } from "@/lib/schemas/node";
 import { deleteNode, updateNode } from "@/lib/services/nodeService";
 import { z } from "zod";
 
+function parseNodeId(id: string) {
+  return z.uuid().safeParse(id);
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id: nodeId } = await params;
-    const node = get(nodeId);
+    const { id } = await params;
+
+    if (!parseNodeId(id).success) {
+      return Response.json({ error: "Invalid node id" }, { status: 400 });
+    }
+
+    const node = get(id);
 
     if (!node) {
       return Response.json(
-        { error: `Node with id=${nodeId} not found` },
+        { error: `Node with id=${id} not found` },
         { status: 404 },
       );
     }
@@ -29,12 +38,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id: nodeId } = await params;
-    const deleted = deleteNode(nodeId);
+    const { id } = await params;
+
+    if (!parseNodeId(id).success) {
+      return Response.json({ error: "Invalid node id" }, { status: 400 });
+    }
+    const deleted = deleteNode(id);
 
     if (!deleted) {
       return Response.json(
-        { error: `Node with id=${nodeId} not found` },
+        { error: `Node with id=${id} not found` },
         { status: 404 },
       );
     }
@@ -50,7 +63,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id: nodeId } = await params;
+    const { id } = await params;
+
+    if (!parseNodeId(id).success) {
+      return Response.json({ error: "Invalid node id" }, { status: 400 });
+    }
 
     const body = await request.json();
 
@@ -63,18 +80,18 @@ export async function PUT(
       );
     }
 
-    const existing = get(nodeId);
+    const existing = get(id);
 
     if (!existing) {
       return Response.json(
-        { error: `Node with id=${nodeId} not found` },
+        { error: `Node with id=${id} not found` },
         { status: 404 },
       );
     }
 
     const { summary, content } = validationResult.data;
 
-    const node = updateNode(nodeId, { ...existing, content, summary });
+    const node = updateNode(id, { ...existing, content, summary });
 
     return Response.json(node, { status: 200 });
   } catch (e) {

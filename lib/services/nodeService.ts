@@ -55,13 +55,16 @@ export function updateNode(
 
 function cascadeDelete(id: string): boolean {
   const node = get(id);
+
   if (!node) return false;
 
   let childId = node.firstChildId;
   while (childId) {
     const child = get(childId);
     const nextSiblingId = child?.nextSiblingId ?? null;
+
     if (!cascadeDelete(childId)) return false;
+
     childId = nextSiblingId;
   }
 
@@ -70,61 +73,54 @@ function cascadeDelete(id: string): boolean {
 
 export function deleteNode(id: string): boolean {
   const nodeToDelete = get(id);
+
   if (!nodeToDelete) return false;
 
-  let childId = nodeToDelete.firstChildId;
-  while (childId) {
-    const child = get(childId);
-    const nextSiblingId = child?.nextSiblingId ?? null;
-    if (!cascadeDelete(childId)) return false;
-    childId = nextSiblingId;
+  if (!cascadeDelete(id))
+    throw new Error(`Failed to delete subtree
+   of node ${id}`);
+
+  const { prevSiblingId, nextSiblingId, parentId } = nodeToDelete;
+
+  if (prevSiblingId) {
+    const prevSibling = get(prevSiblingId);
+
+    if (!prevSibling) throw new Error(`Node ${prevSiblingId} not found`);
+
+    set(prevSiblingId, {
+      ...prevSibling,
+      nextSiblingId: nextSiblingId || null,
+    });
   }
 
-  const deleted = remove(id);
+  if (nextSiblingId) {
+    const nextSibling = get(nextSiblingId);
 
-  if (deleted) {
-    const { prevSiblingId, nextSiblingId, parentId } = nodeToDelete;
+    if (!nextSibling) throw new Error(`Node ${nextSiblingId} not found`);
 
-    if (prevSiblingId) {
-      const prevSibling = get(prevSiblingId);
-
-      if (!prevSibling) throw new Error(`Node ${prevSiblingId} not found`);
-
-      set(prevSiblingId, {
-        ...prevSibling,
-        nextSiblingId: nextSiblingId || null,
-      });
-    }
-
-    if (nextSiblingId) {
-      const nextSibling = get(nextSiblingId);
-
-      if (!nextSibling) throw new Error(`Node ${nextSiblingId} not found`);
-
-      set(nextSiblingId, {
-        ...nextSibling,
-        prevSiblingId: prevSiblingId || null,
-      });
-    }
-
-    if (parentId) {
-      const parent = get(parentId);
-
-      if (!parent) throw new Error(`Node ${parentId} not found`);
-
-      set(parentId, {
-        ...parent,
-        firstChildId:
-          parent.firstChildId === id
-            ? (nextSiblingId ?? null)
-            : parent.firstChildId,
-        lastChildId:
-          parent.lastChildId === id
-            ? (prevSiblingId ?? null)
-            : parent.lastChildId,
-      });
-    }
+    set(nextSiblingId, {
+      ...nextSibling,
+      prevSiblingId: prevSiblingId || null,
+    });
   }
 
-  return deleted;
+  if (parentId) {
+    const parent = get(parentId);
+
+    if (!parent) throw new Error(`Node ${parentId} not found`);
+
+    set(parentId, {
+      ...parent,
+      firstChildId:
+        parent.firstChildId === id
+          ? (nextSiblingId ?? null)
+          : parent.firstChildId,
+      lastChildId:
+        parent.lastChildId === id
+          ? (prevSiblingId ?? null)
+          : parent.lastChildId,
+    });
+  }
+
+  return true;
 }
