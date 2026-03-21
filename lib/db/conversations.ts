@@ -2,6 +2,10 @@ import { Conversation, NewConversation } from "../types/conversation";
 
 const conversations = new Map<string, Conversation>();
 
+export function clear() {
+  conversations.clear();
+}
+
 export function getAll() {
   return conversations;
 }

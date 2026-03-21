@@ -2,7 +2,7 @@ import z from "zod";
 
 export const ConversationSchema = z.object({
   id: z.uuid(),
-  title: z.string(),
+  title: z.string().min(1),
   createdAt: z.date(),
   rootNodeId: z.uuid().nullable(),
 });
