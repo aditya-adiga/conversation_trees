@@ -1,11 +1,8 @@
+import { parseId } from "@/lib/api/utils";
 import { get } from "@/lib/db/nodes";
 import { NodeSchema } from "@/lib/schemas/node";
 import { deleteNode, updateNode } from "@/lib/services/nodeService";
 import { z } from "zod";
-
-function parseNodeId(id: string) {
-  return z.uuid().safeParse(id);
-}
 
 export async function GET(
   request: Request,
@@ -14,7 +11,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    if (!parseNodeId(id).success) {
+    if (!parseId(id).success) {
       return Response.json({ error: "Invalid node id" }, { status: 400 });
     }
 
@@ -40,7 +37,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    if (!parseNodeId(id).success) {
+    if (!parseId(id).success) {
       return Response.json({ error: "Invalid node id" }, { status: 400 });
     }
     const deleted = deleteNode(id);
@@ -65,7 +62,7 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    if (!parseNodeId(id).success) {
+    if (!parseId(id).success) {
       return Response.json({ error: "Invalid node id" }, { status: 400 });
     }
 
