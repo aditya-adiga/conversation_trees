@@ -7,22 +7,10 @@ import {
 	getSiblings,
 } from "@/lib/data/dummyTree";
 import { useNavigation } from "@/lib/context/NavigationContext";
+import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
 import { useEffect } from "react";
 import NeighbourCard from "./NeighbourCard";
-
-function siblingOpacity(distance: number): number {
-	if (distance === 1) return 0.7;
-	if (distance === 2) return 0.45;
-	return 0.25;
-}
-
-function childOpacity(index: number, total: number): number {
-	const center = (total - 1) / 2;
-	const dist = Math.abs(index - center);
-	const maxDist = Math.max(center, 1);
-	return Math.max(0.3, 0.85 - (dist / maxDist) * 0.55);
-}
 
 export default function NodeView() {
 	const { currentNodeId, navigate } = useNavigation();
