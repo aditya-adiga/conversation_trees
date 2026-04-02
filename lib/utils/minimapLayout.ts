@@ -1,4 +1,4 @@
-import { getChildren, getNode, ROOT_NODE_ID } from "@/lib/data/dummyTree";
+import { getChildren, getNode, ROOT_NODE_ID_LARGE as ROOT_NODE_ID } from "@/lib/data/dummyTreeLarge";
 
 export interface LayoutNode {
 	id: string;

@@ -13,7 +13,7 @@ export default function Minimap() {
 	const r = 2.5;
 
 	return (
-		<div className="fixed bottom-4 right-4 z-50 h-36 w-36 overflow-hidden rounded-full border border-[var(--border)] bg-white/90 shadow-lg backdrop-blur-sm">
+		<div className="fixed bottom-4 right-4 z-50 h-45 w-45 overflow-hidden rounded-full border border-[var(--border)] bg-white/90 shadow-lg backdrop-blur-sm">
 			<svg
 				viewBox={viewBox}
 				preserveAspectRatio="xMidYMid meet"

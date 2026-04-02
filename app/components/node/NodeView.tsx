@@ -5,7 +5,7 @@ import {
 	getChildren,
 	getNode,
 	getSiblings,
-} from "@/lib/data/dummyTree";
+} from "@/lib/data/dummyTreeLarge";
 import { useNavigation } from "@/lib/context/NavigationContext";
 import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
