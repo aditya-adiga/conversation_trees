@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Lora } from "next/font/google";
 import { NavigationProvider } from "@/lib/context/NavigationContext";
+import { ROOT_NODE_ID_LARGE } from "@/lib/data/dummyTreeLarge";
 import Minimap from "./components/minimap/Minimap";
 import "./globals.css";
 
@@ -34,7 +35,7 @@ export default function RootLayout({
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} ${lora.variable} antialiased`}
 			>
-				<NavigationProvider>
+				<NavigationProvider initialNodeId={ROOT_NODE_ID_LARGE}>
 					{children}
 					<Minimap />
 				</NavigationProvider>

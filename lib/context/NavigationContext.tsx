@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useState } from "react";
-import { ROOT_NODE_ID } from "@/lib/data/dummyTree";
 
 interface NavigationContextValue {
 	currentNodeId: string;
@@ -10,8 +9,14 @@ interface NavigationContextValue {
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
 
-export function NavigationProvider({ children }: { children: React.ReactNode }) {
-	const [currentNodeId, setCurrentNodeId] = useState(ROOT_NODE_ID);
+export function NavigationProvider({
+	initialNodeId,
+	children,
+}: {
+	initialNodeId: string;
+	children: React.ReactNode;
+}) {
+	const [currentNodeId, setCurrentNodeId] = useState(initialNodeId);
 
 	const navigate = useCallback((targetId: string | null | undefined) => {
 		if (targetId) setCurrentNodeId(targetId);
