@@ -1,6 +1,4 @@
-import { EventData } from "../types/event";
-
-const eventQueue = new Map<string, EventData[]>();
+const eventQueue = new Map<string, unknown[]>();
 const activeConnections = new Set<string>();
 
 export function registerConnection(botId: string) {
@@ -15,11 +13,9 @@ export function isConnected(botId: string) {
   return activeConnections.has(botId);
 }
 
-export function update(botId: string, eventData: EventData) {
+export function update(botId: string, payload: unknown) {
   const existing = eventQueue.get(botId) ?? [];
-  eventQueue.set(botId, [...existing, eventData]);
-
-  return true;
+  eventQueue.set(botId, [...existing, payload]);
 }
 
 export function flush(botId: string) {

@@ -1,6 +1,5 @@
 import { emitter } from "../emitter/emitter";
 import { flush, update } from "../db/eventQueue";
-import { EventData } from "../types/event";
 
 export function flushQueue(botId: string) {
   const queueData = flush(botId);
@@ -9,15 +8,11 @@ export function flushQueue(botId: string) {
     return;
   }
 
-  emitter.emit(botId, queueData);
+  for (const payload of queueData) {
+    emitter.emit(botId, payload);
+  }
 }
 
-export function updateQueue(botId: string, eventData: EventData) {
-  const updated = update(botId, eventData);
-
-  if (!updated) {
-    return;
-  }
-
-  emitter.emit(botId, eventData);
+export function updateQueue(botId: string, payload: unknown) {
+  update(botId, payload);
 }

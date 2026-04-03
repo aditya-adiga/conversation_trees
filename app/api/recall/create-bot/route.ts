@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         meeting_url: body.url,
-        bot_name: "Recall AI trascriber",
+        bot_name: "Recall AI",
         recording_config: {
           transcript: {
             provider: {
