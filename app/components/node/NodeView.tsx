@@ -1,5 +1,6 @@
 "use client";
 
+import { OPACITY } from "@/lib/constants/layout";
 import {
 	getAllSiblingIds,
 	getChildren,
@@ -12,16 +13,19 @@ import { useCallback, useEffect, useState } from "react";
 import NeighbourCard from "./NeighbourCard";
 
 function siblingOpacity(distance: number): number {
-	if (distance === 1) return 0.7;
-	if (distance === 2) return 0.45;
-	return 0.25;
+	if (distance === 1) return OPACITY.SIBLING.NEAR;
+	if (distance === 2) return OPACITY.SIBLING.MEDIUM;
+	return OPACITY.SIBLING.FAR;
 }
 
 function childOpacity(index: number, total: number): number {
 	const center = (total - 1) / 2;
 	const dist = Math.abs(index - center);
 	const maxDist = Math.max(center, 1);
-	return Math.max(0.3, 0.85 - (dist / maxDist) * 0.55);
+	return Math.max(
+		OPACITY.CHILD.MIN,
+		OPACITY.CHILD.MAX - (dist / maxDist) * OPACITY.CHILD.SPREAD,
+	);
 }
 
 export default function NodeView() {
@@ -115,7 +119,7 @@ export default function NodeView() {
 							node={parent}
 							direction="parent"
 							onClick={() => navigate(parent.id)}
-							opacity={0.6}
+							opacity={OPACITY.PARENT}
 						/>
 					</div>
 				) : (
@@ -140,7 +144,7 @@ export default function NodeView() {
 
 				{/* Current node — center */}
 				<div className="flex h-full items-center justify-center">
-					<div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-white p-10 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)]">
+					<div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--card)] p-10 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)]">
 						<h2 className="mb-4 font-serif text-2xl font-semibold tracking-tight text-[var(--text-heading)]">
 							{node.summary || "Untitled"}
 						</h2>
