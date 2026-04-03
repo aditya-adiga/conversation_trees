@@ -10,6 +10,7 @@ import {
 } from "@/lib/data/dummyTree";
 import type { CTNode } from "@/lib/types/node";
 import { useCallback, useEffect, useState } from "react";
+import CurrentNodeCard from "./CurrentNodeCard";
 import NeighbourCard from "./NeighbourCard";
 
 function siblingOpacity(distance: number): number {
@@ -144,14 +145,7 @@ export default function NodeView() {
 
 				{/* Current node — center */}
 				<div className="flex h-full items-center justify-center">
-					<div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--card)] p-10 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)]">
-						<h2 className="mb-4 font-serif text-2xl font-semibold tracking-tight text-[var(--text-heading)]">
-							{node.summary || "Untitled"}
-						</h2>
-						<p className="text-[15px] leading-relaxed text-[var(--text-body)]">
-							{node.content}
-						</p>
-					</div>
+					<CurrentNodeCard node={node} />
 				</div>
 
 				{/* Siblings after — stacked, nearest on top */}
