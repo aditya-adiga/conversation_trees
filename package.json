@@ -7,9 +7,9 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "dotenv -e .env -- concurrently \"next dev\" \"ngrok http 3000 --url $NGROK_DOMAIN\"",
+    "dev": "dotenv -e .env -- concurrently \"next dev\" \"ngrok http 3000 --url \\$NGROK_DOMAIN\"",
     "build": "next build",
-    "start": "dotenv -e .env -- concurrently \"next start\" \"ngrok http 3000 --url $NGROK_DOMAIN\"",
+    "start": "dotenv -e .env -- concurrently \"next start\" \"ngrok http 3000 --url \\$NGROK_DOMAIN\"",
     "lint": "eslint",
     "format": "biome format . --write",
     "typecheck": "tsc --noEmit",
@@ -19,6 +19,7 @@
     "validate": "bun run typecheck && bun run lint"
   },
   "dependencies": {
+    "@openrouter/sdk": "^0.10.2",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
