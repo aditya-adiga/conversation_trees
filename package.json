@@ -7,9 +7,9 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "dotenv -e .env -- concurrently \"next dev\" \"ngrok http 3000 --url $NGROK_DOMAIN\"",
     "build": "next build",
-    "start": "next start",
+    "start": "dotenv -e .env -- concurrently \"next start\" \"ngrok http 3000 --url $NGROK_DOMAIN\"",
     "lint": "eslint",
     "format": "biome format . --write",
     "typecheck": "tsc --noEmit",
@@ -31,6 +31,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
