@@ -1,8 +1,16 @@
 import { updateQueue, flushQueue } from "@/lib/services/eventsQueueProcessor";
 import { emitter } from "@/lib/emitter/emitter";
 import { isConnected } from "@/lib/db/eventQueue";
-import { TranscriptDataEventSchema, EventDataSchema } from "@/lib/schemas/event";
-import { accumulate, processWindow, drainAndCleanup, forceFlush } from "@/lib/services/windowBuffer";
+import {
+  TranscriptDataEventSchema,
+  EventDataSchema,
+} from "@/lib/schemas/event";
+import {
+  accumulate,
+  processWindow,
+  drainAndCleanup,
+  forceFlush,
+} from "@/lib/services/windowBuffer";
 import { EventData, TranscriptDataEvent } from "@/lib/types/event";
 
 const TERMINAL_EVENTS = ["bot.done", "bot.fatal"];
@@ -17,6 +25,7 @@ function dispatch(botId: string, payload: Parameters<typeof emitter.emit>[1]) {
   }
 }
 
+// TODO: remove manual logging
 function logReceived(botId: string, event: TranscriptDataEvent | EventData) {
   const count = (receivedCounts.get(botId) ?? 0) + 1;
   receivedCounts.set(botId, count);
@@ -35,7 +44,7 @@ export async function POST(request: Request) {
       accumulate(botId, eventData);
       processWindow(botId).then((node) => {
         if (node) {
-          dispatch(botId, { eventData, node });
+          dispatch(botId, { node });
         }
       });
     } else {
@@ -45,20 +54,24 @@ export async function POST(request: Request) {
       logReceived(botId, eventData);
 
       if (TERMINAL_EVENTS.includes(eventData.event)) {
-        console.log(`[Webhook:${botId}] Terminal event "${eventData.event}". Total events received from Recall: ${receivedCounts.get(botId) ?? 0}`);
+        console.log(
+          `[Webhook:${botId}] Terminal event "${eventData.event}". Total events received from Recall: ${receivedCounts.get(botId) ?? 0}`,
+        );
         receivedCounts.delete(botId);
 
         // Force-generate a final node from any remaining unprocessed chunks,
         // then drain in-flight calls, then emit the terminal event and close.
         // We respond 201 immediately so Recall AI does not time out.
-        forceFlush(botId).then((node) => {
-          if (node) dispatch(botId, { node });
-          return drainAndCleanup(botId);
-        }).then(() => {
-          dispatch(botId, { eventData });
-          flushQueue(botId);
-          emitter.emit(`${botId}:close`);
-        });
+        forceFlush(botId)
+          .then((node) => {
+            if (node) dispatch(botId, { node });
+            return drainAndCleanup(botId);
+          })
+          .then(() => {
+            dispatch(botId, { eventData });
+            flushQueue(botId);
+            emitter.emit(`${botId}:close`);
+          });
 
         return Response.json({ status: 201 });
       }
