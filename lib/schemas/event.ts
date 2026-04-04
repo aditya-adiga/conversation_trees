@@ -68,9 +68,17 @@ export const TranscriptDataEventSchema = z.object({
   }),
 });
 
+export const BufferNodeSchema = z.object({
+  id: z.string().uuid(),
+  content: z.string(),
+  summary: z.string(),
+  parentId: z.string().uuid().nullable(),
+});
+
 export const BotBufferSchema = z.object({
   chunks: z.array(TranscriptDataEventSchema),
   cursor: z.number(),
+  nodes: z.array(BufferNodeSchema),
 });
 
 export const BotCreationSchema = z.object({
