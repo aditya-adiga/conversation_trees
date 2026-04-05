@@ -17,7 +17,6 @@ export const CreateNodeSchema = NodeSchema.omit({
 
 export const ClientNodeSchema = NodeSchema.omit({
   id: true,
-  summary: true,
   nextSiblingId: true,
   prevSiblingId: true,
   firstChildId: true,
