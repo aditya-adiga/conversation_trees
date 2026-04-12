@@ -3,34 +3,104 @@ import { BotBuffer, TranscriptDataEvent } from "../types/event";
 import { openRouter } from "./openRouter";
 import { createNode } from "./nodeService";
 
+const PROMPT = `
+  You are a professional conversation analytic, which specialises in clear presentation of information that was discussed during the conversation.
+
+  THE GOAL:
+  You are building the conversation tree in realtime with a limited amount of context. The tree allows user to navigate past conversations and have a reference to what they were talking about.
+  The tree has nodes - conversation insights - organized as a tree.
+  Every time you will be provided with a numbered list of transcript chunks and your task is to decide whether to generate one or more insights, or wait for more context.
+
+  What is insight?
+  Insight is a 1 sentence summary of what the conversation participants were talking about.
+
+  TREE STRUCTURE & PARENT SELECTION:
+  A parent → child relationship means: "this child topic was introduced AS PART OF the parent topic's discussion."
+  The tree encodes TOPICAL STRUCTURE, not just chronological order.
+
+  Decision process — ask these questions in order:
+  1. What is this chunk specifically about? (one phrase)
+  2. Scan the tree from bottom to top. Which node represents the context in which THIS topic was introduced?
+  3. That node is the parent. It does NOT necessarily have to be the most recently added node.
+
+  Specific rules:
+  - DIRECT CONTINUATION: The chunk deepens or elaborates the exact same point as the most recent node → parentId = most recent node (extend the chain downward).
+  - TOPIC SHIFT / ZOOM OUT: The conversation moves away from a specific sub-topic to something broader or different → find the ancestor node whose topic best matches where this new discussion belongs, and use THAT as the parent. Do NOT keep going deeper.
+  - COMPLETELY NEW THREAD: The topic is unrelated to anything in the tree → parentId = null (new root).
+
+  The correct shape for a conversation that covers several topics looks like:
+  A (opening / context)
+  ├── B (first topic)
+  │   └── C (detail about B)
+  └── D (second topic, introduced after B was done)
+      ├── E (detail about D)
+      └── F (another angle on D)
+
+  Before setting parentId, ask: "Is this chunk still drilling into the most recent node's specific point, or is it starting something that belongs higher up the tree?"
+
+  MULTIPLE NODES:
+  You may generate more than one node if the provided chunks cover multiple distinct topics or a clear topic shift.
+  Return nodes in chronological order (earliest topic first).
+
+  PARTIAL CONSUMPTION:
+  The chunks are numbered [1], [2], [3], … You do not have to consume all of them if you do not need them.
+  Set chunksConsumed to the number of chunks (from [1] onwards) that your nodes cover.
+  Remaining chunks will be carried over to the next call.
+  Set chunksConsumed to 0 when accumulating.
+
+  INTRA-BATCH PARENT REFERENCES:
+  If a node you are generating should be a child of another node you are also generating in this same response,
+  set parentBatchIndex to the 0-based index of that parent node within the nodes array (instead of a UUID).
+  Otherwise set parentBatchIndex to null and use parentId for an existing node UUID (or null for the root).
+
+  Output:
+  Always return ONLY JSON. For status parameter use only "generated" - if you decided to generate at least one node, or "accumulating" - if you decided to skip generation this time.
+
+  {
+    "status": "generated/accumulating",
+    "nodes": [
+      {
+        "content": "Copy verbatim ALL words from every chunk this node covers, in order. Do not skip, paraphrase, or omit any words.",
+        "summary": "Short gist of the insight",
+        "parentId": "UUID of an existing parent node, or null if this is the first node",
+        "parentBatchIndex": null
+      }
+    ],
+    "chunksConsumed": 3
+  }
+
+  Below is a current chunk of conversation:
+`;
+
+const FORCE_NOTE =
+  '\n\nIMPORTANT: This is the final chunk of the conversation. You MUST generate a node now — do not return "accumulating".';
+
+const LLMNodeSchema = z.object({
+  content: z.string(),
+  summary: z.string(),
+  parentId: z.string().uuid().nullable(),
+  parentBatchIndex: z.number().int().min(0).nullable().optional(),
+});
+
 const LLMResponseSchema = z.object({
   status: z.enum(["generated", "accumulating"]),
-  node: z
-    .object({
-      content: z.string(),
-      summary: z.string(),
-      parentId: z.string().uuid().nullable(),
-    })
-    .nullable(),
+  nodes: z.array(LLMNodeSchema),
+  chunksConsumed: z.number().int().min(0),
 });
 
 // Stores transcription, calls LLM to generate new nodes, saves new nodes to in-memory db
 const windowBuffer = new Map<string, BotBuffer>();
 const locks = new Map<string, Promise<void>>();
-// skip queueing a new LLM call while one is already in-flight. New chunks are accumulated in the buffer and picked up by the next call
+// Skip queueing a new LLM call while one is already in-flight.
+// New chunks are accumulated in the buffer and picked up by the next call.
 const inflight = new Set<string>();
 
-// Each call chains onto the previous one's promise, so concurrent webhook requests queue up rather than racing to read and update the buffer.
+// Each call chains onto the previous one's promise, so concurrent webhook
+// requests queue up rather than racing to read and update the buffer.
 function withLock<T>(botId: string, fn: () => Promise<T>): Promise<T> {
   const prev = locks.get(botId) ?? Promise.resolve();
   const current = prev.then(() => fn());
-  locks.set(
-    botId,
-    current.then(
-      () => {},
-      () => {},
-    ),
-  );
+  locks.set(botId, current.then(() => {}, () => {}));
   return current;
 }
 
@@ -41,8 +111,7 @@ export function accumulate(
   const buffer = windowBuffer.get(botId);
 
   const text = transcript_chunk.data.data.words.map((w) => w.text).join(" ");
-  const chunkIndex = (buffer?.chunks.length ?? 0);
-  console.log(`[WindowBuffer:${botId}] Accumulated chunk #${chunkIndex}: "${text}"`);
+  console.log(`[WindowBuffer:${botId}] Accumulated chunk #${buffer?.chunks.length ?? 0}: "${text}"`);
 
   windowBuffer.set(botId, {
     chunks: [...(buffer?.chunks ?? []), transcript_chunk],
@@ -52,16 +121,17 @@ export function accumulate(
 }
 
 function prepareChunks(buffer: BotBuffer) {
-  const window = buffer?.chunks.slice(buffer.cursor);
-  const windowSize = window?.length;
-  const accumulated_context = window
-    ?.map((chunk) => {
-      const text = chunk.data.data.words.map((word) => word.text).join(" ");
-      return text;
-    })
+  const window = buffer.chunks.slice(buffer.cursor);
+  const windowSize = window.length;
+  const texts = window.map((chunk) =>
+    chunk.data.data.words.map((word) => word.text).join(" "),
+  );
+  const hasContent = texts.some((t) => t.trim() !== "");
+  const accumulated_context = texts
+    .map((text, i) => `[${i + 1}] ${text}`)
     .join("\n");
 
-  return { accumulated_context, windowSize };
+  return { accumulated_context, windowSize, hasContent };
 }
 
 export function cleanupBuffer(botId: string) {
@@ -87,13 +157,43 @@ export async function drainAndCleanup(botId: string): Promise<void> {
 function buildTreeContext(nodes: BotBuffer["nodes"]): string {
   if (nodes.length === 0) return "";
 
-  const reversed = [...nodes].reverse();
-  const lines = reversed.map(
-    (n) =>
-      `- Node ${n.id} (parent: ${n.parentId ?? "root"})\n  Summary: ${n.summary}\n  Content: ${n.content}`,
-  );
+  const childrenMap = new Map<string | null, BotBuffer["nodes"]>();
+  for (const n of nodes) {
+    const key = n.parentId ?? null;
+    if (!childrenMap.has(key)) childrenMap.set(key, []);
+    childrenMap.get(key)!.push(n);
+  }
 
-  return `\n\nExisting conversation tree nodes (most recent first):\n${lines.join("\n")}\n`;
+  const lines: string[] = [];
+  function render(parentId: string | null, indent: string) {
+    for (const n of childrenMap.get(parentId) ?? []) {
+      lines.push(`${indent}[${n.id}] ${n.summary}`);
+      render(n.id, `${indent}  `);
+    }
+  }
+  render(null, "");
+
+  const last = nodes[nodes.length - 1];
+
+  return (
+    `\n\nCurrent conversation tree (indented = child of the node above it):` +
+    `\n${lines.join("\n")}` +
+    `\n\nMost recently added node: [${last.id}] "${last.summary}"\n`
+  );
+}
+
+function stripCodeFences(raw: string): string {
+  return raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+}
+
+function buildPrompt(opts: { force?: boolean }, treeContext: string, accumulatedContext: string): string {
+  const parts = [PROMPT];
+  if (opts.force) parts.push(FORCE_NOTE);
+  parts.push(treeContext, accumulatedContext);
+  return parts.join("");
 }
 
 async function processWindowInner(botId: string, opts: { force?: boolean } = {}) {
@@ -101,16 +201,12 @@ async function processWindowInner(botId: string, opts: { force?: boolean } = {})
 
   if (!buffer) return;
 
-  const { accumulated_context, windowSize } = prepareChunks(buffer);
+  const { accumulated_context, windowSize, hasContent } = prepareChunks(buffer);
 
-  if (!windowSize || !accumulated_context.trim()) return;
+  if (!windowSize || !hasContent) return;
 
   try {
     const treeContext = buildTreeContext(buffer.nodes);
-
-    const forceNote = opts.force
-      ? "\n\nIMPORTANT: This is the final chunk of the conversation. You MUST generate a node now — do not return \"accumulating\"."
-      : "";
 
     const completion = await openRouter.chat.send({
       chatGenerationParams: {
@@ -118,7 +214,7 @@ async function processWindowInner(botId: string, opts: { force?: boolean } = {})
         messages: [
           {
             role: "user",
-            content: PROMPT + forceNote + treeContext + accumulated_context,
+            content: buildPrompt(opts, treeContext, accumulated_context),
           },
         ],
         stream: false,
@@ -126,31 +222,40 @@ async function processWindowInner(botId: string, opts: { force?: boolean } = {})
     });
 
     const raw = completion.choices[0].message.content;
-    const stripped = raw
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```$/, "")
-      .trim();
-    const response = LLMResponseSchema.parse(JSON.parse(stripped));
-    console.log(response.status)
+    const response = LLMResponseSchema.parse(JSON.parse(stripCodeFences(raw)));
 
-    if (response.status === "accumulating") {
+    if (response.status === "accumulating" || response.nodes.length === 0) {
       return;
     }
 
-    const { content, summary, parentId } = response.node!;
-    const node = createNode({ content, summary, parentId });
+    const bufferNodes: BotBuffer["nodes"] = [];
+    const createdNodes: ReturnType<typeof createNode>[] = [];
+
+    for (const spec of response.nodes) {
+      const batchIndex = spec.parentBatchIndex ?? null;
+      const resolvedParentId =
+        batchIndex !== null && batchIndex < bufferNodes.length
+          ? bufferNodes[batchIndex].id
+          : spec.parentId;
+
+      const node = createNode({ content: spec.content, summary: spec.summary, parentId: resolvedParentId });
+      bufferNodes.push({ id: node.id, content: spec.content, summary: spec.summary, parentId: resolvedParentId });
+      createdNodes.push(node);
+    }
+
+    // If LLM forgot to set chunksConsumed, fall back to consuming the full window.
+    const chunksConsumed = response.chunksConsumed > 0
+      ? Math.min(response.chunksConsumed, windowSize)
+      : windowSize;
 
     const current = windowBuffer.get(botId)!;
     windowBuffer.set(botId, {
       chunks: current.chunks,
-      cursor: buffer.cursor + windowSize,
-      nodes: [
-        ...current.nodes,
-        { id: node.id, content, summary, parentId },
-      ],
+      cursor: buffer.cursor + chunksConsumed,
+      nodes: [...current.nodes, ...bufferNodes],
     });
 
-    return node;
+    return createdNodes;
   } catch (_e) {
     console.log(_e);
   }
@@ -172,38 +277,3 @@ export function processWindow(botId: string) {
 export function forceFlush(botId: string) {
   return withLock(botId, () => processWindowInner(botId, { force: true }));
 }
-
-const PROMPT = `
-  You are a professional conversation analytic, which specialises in clear presentation of information that was discussed during the conversation.
-
-  THE GOAL:
-  You are building the conversation tree in realtime with a limited amount of context. The tree allows user to navigate past conversations and have a reference to what they were talking about.
-  The tree has nodes - conversation insights - organized as a tree.
-  Every time you will be provided with a chunk of conversation and your task is to decide whether this chunk should be converted into a clear insight or more context accumulation is needed.
-
-  What is insight?
-  Insight is a 1 sentence summary of what the conversation participants were talking about.
-
-  TREE STRUCTURE & PARENT SELECTION:
-  The conversation tree represents topic threads. Each linear chain of nodes (parent → child → grandchild) is one continuous topic.
-  When generating a new node, you must decide its parentId:
-  - If there are no existing nodes yet, set parentId to null (this is the root node).
-  - If the current chunk continues the same topic as the most recent node, set parentId to that most recent node's ID (extending the topic line).
-  - If the conversation has shifted to a different topic or gone on a tangent, set parentId to the node where the conversation diverged from — this creates a new branch in the tree.
-  The existing nodes are listed from most recent to oldest so you can quickly see what was just discussed.
-
-  Output:
-  Always return ONLY JSON. For status parameter use only "generated" - if you decided to generate a new node, or "accumulating" - if you decided to skip generation this time.
-  Leave node as null when no node was generated.
-
-  {
-    "status": "generated/accumulating",
-    "node": {
-      "content": "Copy verbatim ALL words from every chunk provided below, in order. Do not skip, paraphrase, or omit any words — even from chunks you previously decided to accumulate.",
-      "summary": "Short gist of the insight",
-      "parentId": "UUID of the parent node, or null if this is the first node"
-    }
-  }
-
-  Below is a current chunk of conversation:
-`;

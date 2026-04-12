@@ -53,15 +53,23 @@ function makeChunk(words: string[], botId = "bot-1"): TranscriptDataEvent {
   };
 }
 
+type LLMNode = {
+  content: string;
+  summary: string;
+  parentId: string | null;
+  parentBatchIndex?: number | null;
+};
+
 function makeLLMResponse(
   status: "generated" | "accumulating",
-  node: { content: string; summary: string; parentId: string | null } | null = null,
+  nodes: LLMNode[] = [],
+  chunksConsumed = 0,
 ) {
   return {
     choices: [
       {
         message: {
-          content: JSON.stringify({ status, node }),
+          content: JSON.stringify({ status, nodes, chunksConsumed }),
         },
       },
     ],
@@ -162,7 +170,7 @@ describe("windowBuffer", () => {
         parentId: null,
       };
       mockedSend.mockResolvedValueOnce(
-        makeLLMResponse("generated", nodePayload) as never,
+        makeLLMResponse("generated", [nodePayload], 1) as never,
       );
       const fakeNode = {
         id: "node-uuid-1",
@@ -176,20 +184,20 @@ describe("windowBuffer", () => {
 
       const result = await processWindow("bot-1");
 
-      expect(result).toEqual(fakeNode);
+      expect(result).toEqual([fakeNode]);
       expect(mockedCreateNode).toHaveBeenCalledWith(nodePayload);
     });
 
-    it("should advance the cursor after generating a node", async () => {
+    it("should advance the cursor by chunksConsumed after generating a node", async () => {
       accumulate("bot-1", makeChunk(["chunk1"]));
       accumulate("bot-1", makeChunk(["chunk2"]));
 
       mockedSend.mockResolvedValueOnce(
-        makeLLMResponse("generated", {
-          content: "chunk1 chunk2",
-          summary: "First node",
-          parentId: null,
-        }) as never,
+        makeLLMResponse(
+          "generated",
+          [{ content: "chunk1 chunk2", summary: "First node", parentId: null }],
+          2,
+        ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
         id: "node-1",
@@ -215,21 +223,149 @@ describe("windowBuffer", () => {
         mockedSend.mock.calls[1][0].chatGenerationParams.messages[0].content;
       const lines = fullPrompt.trimEnd().split("\n");
       const lastLine = lines[lines.length - 1].trim();
-      expect(lastLine).toBe("chunk3");
-      const transcriptLines = lines.filter(
-        (l: string) => l.trim() === "chunk1" || l.trim() === "chunk2",
+      expect(lastLine).toBe("[1] chunk3");
+      // Only check numbered chunk lines (not tree context which may reference node content)
+      const chunkLines = lines.filter((l: string) => /^\[\d+\]/.test(l.trim()));
+      expect(chunkLines.filter((l: string) => l.includes("chunk1") || l.includes("chunk2"))).toHaveLength(0);
+    });
+
+    it("should only advance cursor by chunksConsumed, leaving remaining chunks for next call", async () => {
+      accumulate("bot-1", makeChunk(["chunk1"]));
+      accumulate("bot-1", makeChunk(["chunk2"]));
+      accumulate("bot-1", makeChunk(["chunk3"]));
+
+      // LLM uses only the first 2 of 3 chunks
+      mockedSend.mockResolvedValueOnce(
+        makeLLMResponse(
+          "generated",
+          [{ content: "chunk1 chunk2", summary: "First node", parentId: null }],
+          2,
+        ) as never,
       );
-      expect(transcriptLines).toHaveLength(0);
+      mockedCreateNode.mockReturnValueOnce({
+        id: "node-1",
+        content: "chunk1 chunk2",
+        summary: "First node",
+        parentId: null,
+        prevSiblingId: null,
+        nextSiblingId: null,
+        firstChildId: null,
+        lastChildId: null,
+      });
+
+      await processWindow("bot-1");
+
+      mockedSend.mockResolvedValueOnce(
+        makeLLMResponse("accumulating") as never,
+      );
+      await processWindow("bot-1");
+
+      const prompt =
+        mockedSend.mock.calls[1][0].chatGenerationParams.messages[0].content;
+      const lines = prompt.trimEnd().split("\n");
+      // chunk3 is the only remaining chunk, numbered [1]
+      expect(lines.some((l: string) => l.trim() === "[1] chunk3")).toBe(true);
+      // Only check numbered chunk lines (not tree context which may reference node content)
+      const chunkLines = lines.filter((l: string) => /^\[\d+\]/.test(l.trim()));
+      expect(chunkLines.filter((l: string) => l.includes("chunk1") || l.includes("chunk2"))).toHaveLength(0);
+    });
+
+    it("should create multiple nodes when LLM returns more than one", async () => {
+      accumulate("bot-1", makeChunk(["topic", "one"]));
+      accumulate("bot-1", makeChunk(["topic", "two"]));
+
+      const nodeA = { content: "topic one", summary: "Topic A", parentId: null };
+      const nodeB = { content: "topic two", summary: "Topic B", parentId: null };
+      mockedSend.mockResolvedValueOnce(
+        makeLLMResponse("generated", [nodeA, nodeB], 2) as never,
+      );
+      const fakeNodeA = {
+        id: "node-a",
+        ...nodeA,
+        prevSiblingId: null,
+        nextSiblingId: null,
+        firstChildId: null,
+        lastChildId: null,
+      };
+      const fakeNodeB = {
+        id: "node-b",
+        ...nodeB,
+        prevSiblingId: null,
+        nextSiblingId: null,
+        firstChildId: null,
+        lastChildId: null,
+      };
+      mockedCreateNode
+        .mockReturnValueOnce(fakeNodeA)
+        .mockReturnValueOnce(fakeNodeB);
+
+      const result = await processWindow("bot-1");
+
+      expect(result).toEqual([fakeNodeA, fakeNodeB]);
+      expect(mockedCreateNode).toHaveBeenCalledTimes(2);
+      expect(mockedCreateNode).toHaveBeenNthCalledWith(1, nodeA);
+      expect(mockedCreateNode).toHaveBeenNthCalledWith(2, nodeB);
+    });
+
+    it("should resolve parentBatchIndex for intra-batch parent references", async () => {
+      accumulate("bot-1", makeChunk(["parent", "topic"]));
+      accumulate("bot-1", makeChunk(["child", "subtopic"]));
+
+      const nodeSpecs = [
+        { content: "parent topic", summary: "Parent", parentId: null, parentBatchIndex: null },
+        { content: "child subtopic", summary: "Child", parentId: null, parentBatchIndex: 0 },
+      ];
+      mockedSend.mockResolvedValueOnce(
+        makeLLMResponse("generated", nodeSpecs, 2) as never,
+      );
+      const fakeParent = {
+        id: "parent-id",
+        content: "parent topic",
+        summary: "Parent",
+        parentId: null,
+        prevSiblingId: null,
+        nextSiblingId: null,
+        firstChildId: null,
+        lastChildId: null,
+      };
+      const fakeChild = {
+        id: "child-id",
+        content: "child subtopic",
+        summary: "Child",
+        parentId: "parent-id",
+        prevSiblingId: null,
+        nextSiblingId: null,
+        firstChildId: null,
+        lastChildId: null,
+      };
+      mockedCreateNode
+        .mockReturnValueOnce(fakeParent)
+        .mockReturnValueOnce(fakeChild);
+
+      const result = await processWindow("bot-1");
+
+      expect(result).toEqual([fakeParent, fakeChild]);
+      expect(mockedCreateNode).toHaveBeenNthCalledWith(1, {
+        content: "parent topic",
+        summary: "Parent",
+        parentId: null,
+      });
+      // Second node's parentId is resolved to the first node's real ID
+      expect(mockedCreateNode).toHaveBeenNthCalledWith(2, {
+        content: "child subtopic",
+        summary: "Child",
+        parentId: "parent-id",
+      });
     });
 
     it("should include tree context from previously generated nodes", async () => {
       accumulate("bot-1", makeChunk(["first", "topic"]));
       mockedSend.mockResolvedValueOnce(
-        makeLLMResponse("generated", {
-          content: "first topic",
-          summary: "Topic one",
-          parentId: null,
-        }) as never,
+        makeLLMResponse(
+          "generated",
+          [{ content: "first topic", summary: "Topic one", parentId: null }],
+          1,
+        ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
         id: "node-aaa",
@@ -276,7 +412,7 @@ describe("windowBuffer", () => {
         choices: [
           {
             message: {
-              content: `\`\`\`json\n${JSON.stringify({ status: "generated", node: nodePayload })}\n\`\`\``,
+              content: `\`\`\`json\n${JSON.stringify({ status: "generated", nodes: [nodePayload], chunksConsumed: 1 })}\n\`\`\``,
             },
           },
         ],
@@ -293,7 +429,7 @@ describe("windowBuffer", () => {
       const result = await processWindow("bot-1");
 
       expect(result).toBeDefined();
-      expect(result!.id).toBe("node-stripped");
+      expect(result![0].id).toBe("node-stripped");
     });
 
     it("should not crash when LLM returns invalid JSON", async () => {
@@ -313,7 +449,7 @@ describe("windowBuffer", () => {
         choices: [
           {
             message: {
-              content: JSON.stringify({ status: "unknown", node: null }),
+              content: JSON.stringify({ status: "unknown", nodes: [], chunksConsumed: 0 }),
             },
           },
         ],
@@ -343,11 +479,11 @@ describe("windowBuffer", () => {
     it("should include force note in the LLM prompt", async () => {
       accumulate("bot-1", makeChunk(["final", "words"]));
       mockedSend.mockResolvedValueOnce(
-        makeLLMResponse("generated", {
-          content: "final words",
-          summary: "Closing",
-          parentId: null,
-        }) as never,
+        makeLLMResponse(
+          "generated",
+          [{ content: "final words", summary: "Closing", parentId: null }],
+          1,
+        ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
         id: "forced-node",
@@ -373,6 +509,32 @@ describe("windowBuffer", () => {
 
       expect(result).toBeUndefined();
       expect(mockedSend).not.toHaveBeenCalled();
+    });
+
+    it("should return an array of nodes", async () => {
+      accumulate("bot-1", makeChunk(["final", "words"]));
+      mockedSend.mockResolvedValueOnce(
+        makeLLMResponse(
+          "generated",
+          [{ content: "final words", summary: "Closing", parentId: null }],
+          1,
+        ) as never,
+      );
+      const fakeNode = {
+        id: "forced-node",
+        content: "final words",
+        summary: "Closing",
+        parentId: null,
+        prevSiblingId: null,
+        nextSiblingId: null,
+        firstChildId: null,
+        lastChildId: null,
+      };
+      mockedCreateNode.mockReturnValueOnce(fakeNode);
+
+      const result = await forceFlush("bot-1");
+
+      expect(result).toEqual([fakeNode]);
     });
   });
 

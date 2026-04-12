@@ -42,9 +42,11 @@ export async function POST(request: Request) {
 
       logReceived(botId, body);
       accumulate(botId, eventData);
-      processWindow(botId).then((node) => {
-        if (node) {
-          dispatch(botId, { node });
+      processWindow(botId).then((nodes) => {
+        if (nodes) {
+          for (const node of nodes) {
+            dispatch(botId, { node });
+          }
         }
       });
     } else {
@@ -63,8 +65,12 @@ export async function POST(request: Request) {
         // then drain in-flight calls, then emit the terminal event and close.
         // We respond 201 immediately so Recall AI does not time out.
         forceFlush(botId)
-          .then((node) => {
-            if (node) dispatch(botId, { node });
+          .then((nodes) => {
+            if (nodes) {
+              for (const node of nodes) {
+                dispatch(botId, { node });
+              }
+            }
             return drainAndCleanup(botId);
           })
           .then(() => {
