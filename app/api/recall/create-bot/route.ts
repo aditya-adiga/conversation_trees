@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const response = await fetch("https://us-east-1.recall.ai/api/v1/bot", {
+    const response = await fetch(`https://${process.env.RECALL_REGION}.recall.ai/api/v1/bot`, {
       method: "POST",
       headers: {
         Authorization: `Token ${process.env.RECALL_API_KEY}`,
