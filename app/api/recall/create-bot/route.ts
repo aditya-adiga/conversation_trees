@@ -1,12 +1,14 @@
 import { BotCreation } from "@/lib/types/event";
-
-export type CreateBotRequest = {
-  url: string;
-};
+import { CreateBotRequestSchema } from "@/lib/schemas/bot";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const parsed = CreateBotRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return Response.json({ error: "Invalid payload" }, { status: 400 });
+    }
 
     const response = await fetch(`https://${process.env.RECALL_REGION}.recall.ai/api/v1/bot`, {
       method: "POST",
@@ -15,7 +17,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        meeting_url: body.url,
+        meeting_url: parsed.data.url,
         bot_name: "Recall AI trascriber",
         recording_config: {
           transcript: {

@@ -9,15 +9,11 @@ export function flushQueue(botId: string) {
     return;
   }
 
-  emitter.emit(botId, queueData);
+  for (const eventData of queueData) {
+    emitter.emit(botId, eventData);
+  }
 }
 
 export function updateQueue(botId: string, eventData: EventData) {
-  const updated = update(botId, eventData);
-
-  if (!updated) {
-    return;
-  }
-
-  emitter.emit(botId, eventData);
+  update(botId, eventData);
 }
