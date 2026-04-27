@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Dev environment setup
 
-## Getting Started
+To start working with existing endpoints locally you should define the following environmental variables inside .env file:
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+RECALL_API_KEY=
+NGROK_AUTH_TOKEN=
+NEXT_PUBLIC_APP_URL=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**RECALL_API_KEY** - Recall ai provides the API to get recordings, transcripts and metadata from video conferencing platforms
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**NGROK_AUTH_TOKEN** - ngrok configuration allows to use persistent https connection as required by Recall ai webhook configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**NEXT_PUBLIC_APP_URL** -persistent ngrok domain to avoid domain name changes on every restart
 
-## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+### Third party services
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+To go with a fully functioning application you need to:
+1. Install and configure ngrok (https://ngrok.com/use-cases/share-localhost):
+    - install ngrok
+    - add your auth token
+2. Create Recall ai account and configure the webhook endpoint, that should follow the template:
+```
+https://{your-persistent-ngrok-domain}/api/webhooks/recall/stream
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Getting started
 
-## Deploy on Vercel
+1. To start the development server and enable hot reload run: 
+    ```
+    bun run dev
+    ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+    It will automatically start the app and ngrok for you
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Because the store is held in memory, hot reload will reset its state between requests. To test endpoints with persistent data, disable hot reload by running:
+
+    ```
+    bun run build
+    ```
+
+    ```
+    bun run start
+    ```
