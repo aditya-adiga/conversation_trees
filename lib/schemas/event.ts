@@ -1,25 +1,23 @@
 import { z } from "zod";
 
+const RecallEntitySchema = z.object({
+  id: z.string(),
+  metadata: z.object({}),
+});
+
 export const EventDataSchema = z.object({
   event: z.string(),
   data: z.object({
-    bot: z.object({
-      id: z.string(),
-      metadata: z.object({}),
-    }),
-    data: z.object({
-      code: z.string(),
-      sub_code: z.string().nullable(),
-      updated_at: z.string(),
-    }).optional(),
-    recording: z.object({
-      id: z.string(),
-      metadata: z.object({}),
-    }).optional(),
-    transcript: z.object({
-      id: z.string(),
-      metadata: z.object({}),
-    }).optional(),
+    bot: RecallEntitySchema,
+    data: z
+      .object({
+        code: z.string(),
+        sub_code: z.string().nullable(),
+        updated_at: z.string(),
+      })
+      .optional(),
+    recording: RecallEntitySchema.optional(),
+    transcript: RecallEntitySchema.optional(),
   }),
 });
 
@@ -38,9 +36,9 @@ export const TranscriptDataEventSchema = z.object({
             relative: z.number(),
             absolute: z.string(),
           }),
-        })
+        }),
       ),
-      language_code: z.string(),
+      language_code: z.string().optional(),
       participant: z.object({
         id: z.number(),
         name: z.string(),
@@ -49,22 +47,10 @@ export const TranscriptDataEventSchema = z.object({
         extra_data: z.record(z.string(), z.unknown()),
       }),
     }),
-    transcript: z.object({
-      id: z.string(),
-      metadata: z.object({}),
-    }),
-    realtime_endpoint: z.object({
-      id: z.string(),
-      metadata: z.object({}),
-    }),
-    recording: z.object({
-      id: z.string(),
-      metadata: z.object({}),
-    }),
-    bot: z.object({
-      id: z.string(),
-      metadata: z.object({}),
-    }),
+    transcript: RecallEntitySchema,
+    realtime_endpoint: RecallEntitySchema,
+    recording: RecallEntitySchema,
+    bot: RecallEntitySchema,
   }),
 });
 
@@ -89,9 +75,10 @@ export const BotCreationSchema = z.object({
       sub_code: z.string().nullable(),
       updated_at: z.string(),
     }),
-    bot: z.object({
-      id: z.string(),
-      metadata: z.object({}),
-    }),
+    bot: RecallEntitySchema,
   }),
+});
+
+export const CreateBotRequestSchema = z.object({
+  url: z.url(),
 });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { BotBuffer, TranscriptDataEvent } from "../types/event";
 import { openRouter } from "./openRouter";
 import { createNode } from "./nodeService";
+import { get as getNode } from "../db/nodes";
 
 const PROMPT = `
   You are a professional conversation analytic, which specialises in clear presentation of information that was discussed during the conversation.
@@ -100,7 +101,13 @@ const inflight = new Set<string>();
 function withLock<T>(botId: string, fn: () => Promise<T>): Promise<T> {
   const prev = locks.get(botId) ?? Promise.resolve();
   const current = prev.then(() => fn());
-  locks.set(botId, current.then(() => {}, () => {}));
+  locks.set(
+    botId,
+    current.then(
+      () => {},
+      () => {},
+    ),
+  );
   return current;
 }
 
@@ -111,7 +118,9 @@ export function accumulate(
   const buffer = windowBuffer.get(botId);
 
   const text = transcript_chunk.data.data.words.map((w) => w.text).join(" ");
-  console.log(`[WindowBuffer:${botId}] Accumulated chunk #${buffer?.chunks.length ?? 0}: "${text}"`);
+  console.log(
+    `[WindowBuffer:${botId}] Accumulated chunk #${buffer?.chunks.length ?? 0}: "${text}"`,
+  );
 
   windowBuffer.set(botId, {
     chunks: [...(buffer?.chunks ?? []), transcript_chunk],
@@ -146,7 +155,7 @@ export async function drainAndCleanup(botId: string): Promise<void> {
   const pending = locks.get(botId);
   if (pending) {
     console.log(
-      `[WindowBuffer:${botId}] Draining ${locks.size} pending processWindow call(s)...`,
+      `[WindowBuffer:${botId}] Draining pending processWindow call(s)...`,
     );
     await pending;
     console.log(`[WindowBuffer:${botId}] Drain complete`);
@@ -158,6 +167,7 @@ function buildTreeContext(nodes: BotBuffer["nodes"]): string {
   if (nodes.length === 0) return "";
 
   const childrenMap = new Map<string | null, BotBuffer["nodes"]>();
+
   for (const n of nodes) {
     const key = n.parentId ?? null;
     if (!childrenMap.has(key)) childrenMap.set(key, []);
@@ -165,6 +175,7 @@ function buildTreeContext(nodes: BotBuffer["nodes"]): string {
   }
 
   const lines: string[] = [];
+
   function render(parentId: string | null, indent: string) {
     for (const n of childrenMap.get(parentId) ?? []) {
       lines.push(`${indent}[${n.id}] ${n.summary}`);
@@ -182,6 +193,15 @@ function buildTreeContext(nodes: BotBuffer["nodes"]): string {
   );
 }
 
+function hasValidParents(nodes: z.infer<typeof LLMResponseSchema>["nodes"]): boolean {
+  return nodes.every(
+    (spec) =>
+      spec.parentBatchIndex != null ||
+      spec.parentId === null ||
+      !!getNode(spec.parentId),
+  );
+}
+
 function stripCodeFences(raw: string): string {
   return raw
     .replace(/^```(?:json)?\s*/i, "")
@@ -189,14 +209,23 @@ function stripCodeFences(raw: string): string {
     .trim();
 }
 
-function buildPrompt(opts: { force?: boolean }, treeContext: string, accumulatedContext: string): string {
+function buildPrompt(
+  opts: { force?: boolean },
+  treeContext: string,
+  accumulatedContext: string,
+): string {
   const parts = [PROMPT];
+
   if (opts.force) parts.push(FORCE_NOTE);
+
   parts.push(treeContext, accumulatedContext);
   return parts.join("");
 }
 
-async function processWindowInner(botId: string, opts: { force?: boolean } = {}) {
+async function processWindowInner(
+  botId: string,
+  opts: { force?: boolean } = {},
+) {
   const buffer = windowBuffer.get(botId);
 
   if (!buffer) return;
@@ -228,6 +257,11 @@ async function processWindowInner(botId: string, opts: { force?: boolean } = {})
       return;
     }
 
+    if (!hasValidParents(response.nodes)) {
+      console.log(`[WindowBuffer:${botId}] Skipping batch — one or more parentIds not found`);
+      return;
+    }
+
     const bufferNodes: BotBuffer["nodes"] = [];
     const createdNodes: ReturnType<typeof createNode>[] = [];
 
@@ -238,15 +272,25 @@ async function processWindowInner(botId: string, opts: { force?: boolean } = {})
           ? bufferNodes[batchIndex].id
           : spec.parentId;
 
-      const node = createNode({ content: spec.content, summary: spec.summary, parentId: resolvedParentId });
-      bufferNodes.push({ id: node.id, content: spec.content, summary: spec.summary, parentId: resolvedParentId });
+      const node = createNode({
+        content: spec.content,
+        summary: spec.summary,
+        parentId: resolvedParentId,
+      });
+      bufferNodes.push({
+        id: node.id,
+        content: spec.content,
+        summary: spec.summary,
+        parentId: resolvedParentId,
+      });
       createdNodes.push(node);
     }
 
     // If LLM forgot to set chunksConsumed, fall back to consuming the full window.
-    const chunksConsumed = response.chunksConsumed > 0
-      ? Math.min(response.chunksConsumed, windowSize)
-      : windowSize;
+    const chunksConsumed =
+      response.chunksConsumed > 0
+        ? Math.min(response.chunksConsumed, windowSize)
+        : windowSize;
 
     const current = windowBuffer.get(botId)!;
     windowBuffer.set(botId, {
@@ -257,7 +301,7 @@ async function processWindowInner(botId: string, opts: { force?: boolean } = {})
 
     return createdNodes;
   } catch (_e) {
-    console.log(_e);
+    console.error(_e);
   }
 }
 
