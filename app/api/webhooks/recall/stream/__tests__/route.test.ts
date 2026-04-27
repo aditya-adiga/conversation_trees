@@ -19,9 +19,11 @@ function makeRequest(body: unknown) {
 
 const BOT_ID = "bot-123";
 const validPayload = {
-  event: "transcript.data",
+  event: "bot.joined",
   data: { bot: { id: BOT_ID, metadata: {} } },
 };
+
+const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 describe("POST /api/webhooks/recall/stream", () => {
   beforeEach(() => {
@@ -32,35 +34,36 @@ describe("POST /api/webhooks/recall/stream", () => {
     unregisterConnection(BOT_ID);
   });
 
-  // Test 1 — Malformed webhook payload (issue #4)
   it("returns 400 for a malformed payload", async () => {
     const res = await POST(makeRequest({ garbage: true }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "Invalid payload" });
   });
 
-  // Test 2 — Valid webhook payload
   it("returns 200 with { status: 201 } for a valid payload", async () => {
     const res = await POST(makeRequest(validPayload));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ status: 201 });
   });
 
-  // Test 3 — Terminal event ordering (issue #3)
   it("emits event data before the close signal for a connected client", async () => {
     registerConnection(BOT_ID);
 
     const emitOrder: string[] = [];
-    const spy = vi.spyOn(emitter, "emit").mockImplementation(
-      (event: string | symbol) => {
+    const spy = vi
+      .spyOn(emitter, "emit")
+      .mockImplementation((event: string | symbol) => {
         emitOrder.push(event as string);
         return true;
-      },
-    );
+      });
 
     await POST(
-      makeRequest({ event: "bot.done", data: { bot: { id: BOT_ID, metadata: {} } } }),
+      makeRequest({
+        event: "bot.done",
+        data: { bot: { id: BOT_ID, metadata: {} } },
+      }),
     );
+    await flushPromises();
 
     const dataIdx = emitOrder.indexOf(BOT_ID);
     const closeIdx = emitOrder.indexOf(`${BOT_ID}:close`);

@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, afterEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { POST } from "../route";
 
 function makeRequest(body: unknown) {
@@ -12,7 +12,15 @@ function makeRequest(body: unknown) {
 const MEETING_URL = "https://meet.google.com/abc-defg-hij";
 
 describe("POST /api/recall/create-bot", () => {
+  beforeEach(() => {
+    vi.stubEnv("RECALL_API_KEY", "test-key");
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubEnv("RECALL_REGION", "us-west-2");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://example.ngrok.app");
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
 

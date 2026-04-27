@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { updateQueue, flushQueue } from "@/lib/services/eventsQueueProcessor";
 import { emitter } from "@/lib/emitter/emitter";
 import { isConnected } from "@/lib/db/eventQueue";
@@ -87,6 +88,9 @@ export async function POST(request: Request) {
 
     return Response.json({ status: 201 });
   } catch (e) {
+    if (e instanceof ZodError) {
+      return Response.json({ error: "Invalid payload" }, { status: 400 });
+    }
     return Response.json({ error: "External server error" }, { status: 500 });
   }
 }
