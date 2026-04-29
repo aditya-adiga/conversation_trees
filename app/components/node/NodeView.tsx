@@ -1,25 +1,24 @@
 "use client";
 
-import {
-	getAllSiblingIds,
-	getChildren,
-	getNode,
-	getSiblings,
-} from "@/lib/data/dummyTreeLarge";
 import { useNavigation } from "@/lib/context/NavigationContext";
+import { getChildren, getAllSiblingIds, getSiblings } from "@/lib/utils/nodeUtils";
 import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import NeighbourCard from "./NeighbourCard";
 
 export default function NodeView() {
-	const { currentNodeId, navigate } = useNavigation();
+	const { currentNodeId, nodes, navigate } = useNavigation();
 
-	const node = getNode(currentNodeId);
-	const parent = node?.parentId ? getNode(node.parentId) : undefined;
-	const siblings = node ? getSiblings(node) : [];
-	const children = node ? getChildren(node) : [];
-	const allSiblingIds = node ? getAllSiblingIds(node) : [];
+	const node = currentNodeId ? nodes.get(currentNodeId) : undefined;
+	const parent = node?.parentId ? nodes.get(node.parentId) : undefined;
+	const siblings = node ? getSiblings(node, nodes) : [];
+	const children = node ? getChildren(node, nodes) : [];
+	const allSiblingIds = useMemo(
+		() => (node ? getAllSiblingIds(node, nodes) : []),
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[node?.id, nodes],
+	);
 	const siblingIndex = node ? allSiblingIds.indexOf(node.id) : -1;
 
 	useEffect(() => {

@@ -63,6 +63,43 @@ NGROK_AUTH_TOKEN        ngrok auth token
 
 ---
 
+## Code structure conventions
+
+### API routes (`app/api/`)
+
+Route files (`route.ts`) handle only HTTP concerns: parse the request, validate input, return a response. Business logic lives in `lib/services/` and is imported.
+
+```
+app/api/<name>/route.ts          ← HTTP only: validate, call service, respond
+lib/services/<name>.ts           ← business logic, pipeline, side-effects
+lib/services/__tests__/<name>.test.ts
+app/api/<name>/__tests__/route.test.ts
+```
+
+**Route file responsibilities:**
+- Parse and validate the request body
+- Return the correct HTTP status and response shape
+- Fire-and-forget background work (`.catch()` errors, respond immediately)
+- Import everything from `lib/`; no business logic inline
+
+**Service file responsibilities:**
+- Own the processing pipeline (accumulate, LLM calls, dispatch, emit)
+- Import from `lib/db/`, `lib/emitter/`, other services as needed
+- Local helpers (e.g. `dispatch`) stay in the service file, not the route
+
+**Test split:**
+- Route test: mock the service, test validation and response shape only
+- Service test: mock `windowBuffer`/`emitter`/`eventQueue`, test pipeline ordering and side-effects
+
+### Services (`lib/services/`)
+
+Prefer extending existing services over creating new ones. When a new service is needed:
+- It should have a single, clear responsibility
+- Export named functions (not classes)
+- Keep `dispatch`-style helpers local to the service that owns them
+
+---
+
 ## Testing
 
 Uses **Vitest**. Run with:

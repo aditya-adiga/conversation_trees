@@ -3,14 +3,13 @@
 import { useNavigation } from "@/lib/context/NavigationContext";
 import { buildMinimapLayout } from "@/lib/utils/minimapLayout";
 
-// Computed once — tree data is static
-const layout = buildMinimapLayout();
+const r = 2.5;
 
 export default function Minimap() {
-	const { currentNodeId, navigate } = useNavigation();
-	const { nodes, edges, viewBox } = layout;
+	const { currentNodeId, nodes, navigate } = useNavigation();
+	const { nodes: layoutNodes, edges, viewBox } = buildMinimapLayout(nodes);
 
-	const r = 2.5;
+	if (layoutNodes.length === 0) return null;
 
 	return (
 		<div className="fixed bottom-4 right-4 z-50 h-45 w-45 overflow-hidden rounded-full border border-[var(--border)] bg-white/90 shadow-lg backdrop-blur-sm">
@@ -31,7 +30,7 @@ export default function Minimap() {
 					/>
 				))}
 
-				{nodes.map((n) => {
+				{layoutNodes.map((n) => {
 					const isCurrent = n.id === currentNodeId;
 					return (
 						<g
