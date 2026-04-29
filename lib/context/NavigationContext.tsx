@@ -8,6 +8,7 @@ interface NavigationContextValue {
 	nodes: Map<string, CTNode>;
 	navigate: (targetId: string | null | undefined) => void;
 	addNode: (node: CTNode) => void;
+	reset: () => void;
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
@@ -54,8 +55,13 @@ export function NavigationProvider({
 		setCurrentNodeId((prev) => prev ?? node.id);
 	}, []);
 
+	const reset = useCallback(() => {
+		setCurrentNodeId(null);
+		setNodes(new Map());
+	}, []);
+
 	return (
-		<NavigationContext.Provider value={{ currentNodeId, nodes, navigate, addNode }}>
+		<NavigationContext.Provider value={{ currentNodeId, nodes, navigate, addNode, reset }}>
 			{children}
 		</NavigationContext.Provider>
 	);
