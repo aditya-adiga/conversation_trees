@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 const SWIPE_THRESHOLD = 40;
 
@@ -13,9 +13,10 @@ export function useSwipe(
 	ref: React.RefObject<HTMLElement | null>,
 	handlers: SwipeHandlers,
 ) {
-	// Keep a stable ref to handlers so the effect never needs to re-run
 	const handlersRef = useRef(handlers);
-	handlersRef.current = handlers;
+	useLayoutEffect(() => {
+		handlersRef.current = handlers;
+	});
 
 	useEffect(() => {
 		const el = ref.current;
