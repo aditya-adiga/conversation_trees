@@ -5,6 +5,7 @@ import { getChildren, getAllSiblingIds, getSiblings } from "@/lib/utils/nodeUtil
 import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
 import { useEffect, useMemo, useRef } from "react";
+import { useSwipe } from "@/lib/hooks/useSwipe";
 import NeighbourCard from "./NeighbourCard";
 
 export default function NodeView() {
@@ -21,6 +22,7 @@ export default function NodeView() {
 	);
 	const siblingIndex = node ? allSiblingIds.indexOf(node.id) : -1;
 
+	const containerRef = useRef<HTMLDivElement>(null);
 	const contentRef = useRef<HTMLParagraphElement>(null);
 
 	useEffect(() => {
@@ -72,6 +74,27 @@ export default function NodeView() {
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [node, navigate, siblingIndex, allSiblingIds]);
 
+	useSwipe(containerRef, {
+		onSwipeUp: () => { if (node?.firstChildId) navigate(node.firstChildId); },
+		onSwipeDown: () => { if (node) navigate(node.parentId); },
+		onSwipeLeft: () => {
+			if (!node || allSiblingIds.length <= 1) return;
+			const prev =
+				siblingIndex > 0
+					? allSiblingIds[siblingIndex - 1]
+					: allSiblingIds[allSiblingIds.length - 1];
+			navigate(prev);
+		},
+		onSwipeRight: () => {
+			if (!node || allSiblingIds.length <= 1) return;
+			const next =
+				siblingIndex < allSiblingIds.length - 1
+					? allSiblingIds[siblingIndex + 1]
+					: allSiblingIds[0];
+			navigate(next);
+		},
+	});
+
 	if (!node) {
 		return (
 			<div className="flex h-full w-full items-center justify-center">
@@ -97,9 +120,9 @@ export default function NodeView() {
 	siblingsBefore.reverse();
 
 	return (
-		<div className="grid h-full w-full grid-rows-[auto_1fr_auto] gap-4 p-6">
-			{/* Parent — top center */}
-			<div className="flex justify-center">
+		<div ref={containerRef} className="flex h-full w-full flex-col overflow-y-auto px-4 pb-52 pt-20 sm:grid sm:grid-rows-[auto_1fr_auto] sm:overflow-hidden sm:gap-4 sm:px-6 sm:pb-6 sm:pt-20">
+			{/* Parent — top center, desktop only */}
+			<div className="hidden sm:flex sm:justify-center">
 				{parent ? (
 					<div className="w-64">
 						<NeighbourCard
@@ -115,10 +138,10 @@ export default function NodeView() {
 				)}
 			</div>
 
-			{/* Middle row: siblings left | current node | siblings right */}
-			<div className="grid grid-cols-[12rem_1fr_12rem] items-center gap-4">
-				{/* Siblings before — stacked, nearest at bottom (closest to center) */}
-				<div className="flex flex-col-reverse items-end gap-2">
+			{/* Middle row: on mobile flex-1 fills remaining height; on desktop grid */}
+			<div className="flex flex-1 items-center justify-center sm:grid sm:grid-cols-[12rem_1fr_12rem] sm:items-center sm:gap-4">
+				{/* Siblings before — desktop only; mobile navigates via swipe */}
+				<div className="hidden sm:flex sm:flex-col-reverse sm:items-end sm:gap-2">
 					{siblingsBefore.map(({ node: s, distance }) => (
 						<NeighbourCard
 							key={s.id}
@@ -131,11 +154,11 @@ export default function NodeView() {
 					))}
 				</div>
 
-				{/* Current node — center */}
-				<div className="flex h-full items-center justify-center">
-					<div className={`w-full max-w-2xl rounded-2xl border p-10 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)] ${node.id === latestNodeId ? "border-[var(--latest)] bg-[var(--latest-bg)]" : "border-[var(--border)] bg-white"}`}>
+				{/* Current node */}
+				<div className="flex w-full flex-col items-center justify-center">
+					<div className={`w-full max-w-2xl rounded-2xl border p-6 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)] sm:p-10 ${node.id === latestNodeId ? "border-[var(--latest)] bg-[var(--latest-bg)]" : "border-[var(--border)] bg-white"}`}>
 						<div className="mb-4 flex items-start gap-3">
-							<h2 className="flex-1 font-serif text-2xl font-semibold tracking-tight text-[var(--text-heading)]">
+							<h2 className="flex-1 font-serif text-xl font-semibold tracking-tight text-[var(--text-heading)] sm:text-2xl">
 								{node.summary || "Untitled"}
 							</h2>
 							{node.id === latestNodeId && (
@@ -154,14 +177,15 @@ export default function NodeView() {
 								</button>
 							)}
 						</div>
-					<p ref={contentRef} className="max-h-96 overflow-y-auto text-[15px] leading-relaxed text-[var(--text-body)]">
-						{node.content}
-					</p>
+						<p ref={contentRef} className="max-h-52 overflow-y-auto text-[15px] leading-relaxed text-[var(--text-body)] sm:max-h-96">
+							{node.content}
+						</p>
 					</div>
+
 				</div>
 
-				{/* Siblings after — stacked, nearest on top */}
-				<div className="flex flex-col items-start gap-2">
+				{/* Siblings after — desktop only */}
+				<div className="hidden sm:flex sm:flex-col sm:items-start sm:gap-2">
 					{siblingsAfter.map(({ node: s, distance }) => (
 						<NeighbourCard
 							key={s.id}
@@ -175,8 +199,8 @@ export default function NodeView() {
 				</div>
 			</div>
 
-			{/* Children — horizontal row, fading at edges */}
-			<div className="flex justify-center">
+			{/* Children — desktop only */}
+			<div className="hidden sm:flex sm:justify-center">
 				{children.length > 0 && (
 					<div className="flex gap-3">
 						{children.map((child, i) => (

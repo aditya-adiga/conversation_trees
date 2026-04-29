@@ -37,7 +37,7 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 
 	return (
 		<div className="flex h-full w-full items-center justify-center">
-			<div className="w-full max-w-lg rounded-2xl bg-[var(--card)] p-10 shadow-[var(--card-shadow)]">
+			<div className="w-full max-w-lg rounded-2xl bg-[var(--card)] p-6 shadow-[var(--card-shadow)] sm:p-10">
 				{/* Header */}
 				<h1 className="mb-1 font-serif text-2xl font-semibold tracking-tight text-[var(--text-heading)]">
 					Conversation Trees
