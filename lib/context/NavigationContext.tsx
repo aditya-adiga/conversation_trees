@@ -5,6 +5,7 @@ import type { CTNode } from "@/lib/types/node";
 
 interface NavigationContextValue {
 	currentNodeId: string | null;
+	latestNodeId: string | null;
 	nodes: Map<string, CTNode>;
 	navigate: (targetId: string | null | undefined) => void;
 	addNode: (node: CTNode) => void;
@@ -19,6 +20,7 @@ export function NavigationProvider({
 	children: React.ReactNode;
 }) {
 	const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
+	const [latestNodeId, setLatestNodeId] = useState<string | null>(null);
 	const [nodes, setNodes] = useState<Map<string, CTNode>>(new Map());
 
 	const navigate = useCallback((targetId: string | null | undefined) => {
@@ -26,6 +28,7 @@ export function NavigationProvider({
 	}, []);
 
 	const addNode = useCallback((node: CTNode) => {
+		setLatestNodeId(node.id);
 		setNodes((prev) => {
 			const next = new Map(prev);
 			next.set(node.id, node);
@@ -57,11 +60,12 @@ export function NavigationProvider({
 
 	const reset = useCallback(() => {
 		setCurrentNodeId(null);
+		setLatestNodeId(null);
 		setNodes(new Map());
 	}, []);
 
 	return (
-		<NavigationContext.Provider value={{ currentNodeId, nodes, navigate, addNode, reset }}>
+		<NavigationContext.Provider value={{ currentNodeId, latestNodeId, nodes, navigate, addNode, reset }}>
 			{children}
 		</NavigationContext.Provider>
 	);
