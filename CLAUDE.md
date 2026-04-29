@@ -45,7 +45,7 @@ Core services (lib/)
 8. Terminal event (`bot.done`) triggers `forceFlush` → `drainAndCleanup` → close
 
 **Text path:**
-Same pipeline from step 4 onward. `POST /api/process-text` splits raw text into sentence chunks, wraps them as `TranscriptDataEvent` objects, and feeds them through `accumulate` → `processWindow` → emit, exactly like the webhook handler does.
+`POST /api/process-text` wraps the full pasted text as a single `TranscriptDataEvent` (words split on whitespace, dummy timestamps), calls `accumulate` + `forceFlush` to generate all nodes in one LLM call, then emits them through the same emitter/queue pipeline before sending a `bot.done` terminal event. The response returns immediately with a `{ botId }` — all processing is async in the background.
 
 ---
 
@@ -62,6 +62,31 @@ NGROK_AUTH_TOKEN        ngrok auth token
 ```
 
 ---
+
+## Testing
+
+Uses **Vitest**. Run with:
+
+```bash
+bun run test          # run all tests once
+bun run test:watch    # watch mode
+```
+
+Test files live next to the code they test under `__tests__/` directories. Patterns to follow (see existing tests):
+
+- Mock module-level dependencies with `vi.mock(...)` **before** imports
+- Use `vi.mocked()` to get typed references to mocked functions
+- Background async work (fire-and-forget) requires `await flushPromises()` before asserting side-effects:
+  ```typescript
+  const flushPromises = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+  ```
+- Use `vi.stubEnv` / `vi.stubGlobal` for env vars and globals; restore with `vi.unstubAllEnvs()` in `afterEach`
+- Always `vi.clearAllMocks()` in `beforeEach`
+
+Coverage areas per route:
+- Input validation (missing fields, wrong types, empty strings, malformed JSON) → 4xx
+- Happy path → correct status + response shape
+- Side effects (emitter calls, queue updates, service calls) and their ordering
 
 ## Running locally
 
