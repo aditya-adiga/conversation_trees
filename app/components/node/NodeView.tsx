@@ -4,7 +4,7 @@ import { useNavigation } from "@/lib/context/NavigationContext";
 import { getChildren, getAllSiblingIds, getSiblings } from "@/lib/utils/nodeUtils";
 import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import NeighbourCard from "./NeighbourCard";
 
 export default function NodeView() {
@@ -20,6 +20,14 @@ export default function NodeView() {
 		[node?.id, nodes],
 	);
 	const siblingIndex = node ? allSiblingIds.indexOf(node.id) : -1;
+
+	const contentRef = useRef<HTMLParagraphElement>(null);
+
+	useEffect(() => {
+		if (contentRef.current) {
+			contentRef.current.scrollTop = 0;
+		}
+	}, [currentNodeId]);
 
 	useEffect(() => {
 		function handleKeyDown(e: KeyboardEvent) {
@@ -127,9 +135,9 @@ export default function NodeView() {
 						<h2 className="mb-4 font-serif text-2xl font-semibold tracking-tight text-[var(--text-heading)]">
 							{node.summary || "Untitled"}
 						</h2>
-						<p className="text-[15px] leading-relaxed text-[var(--text-body)]">
-							{node.content}
-						</p>
+					<p ref={contentRef} className="max-h-96 overflow-y-auto text-[15px] leading-relaxed text-[var(--text-body)]">
+						{node.content}
+					</p>
 					</div>
 				</div>
 

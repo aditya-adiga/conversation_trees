@@ -24,6 +24,7 @@ function makeNode(overrides: Partial<CTNode> & { id: string }): CTNode {
 //
 function makeTree(): Map<string, CTNode> {
 	const root = makeNode({ id: "root", firstChildId: "A", lastChildId: "C" });
+	const otherRoot = makeNode({ id: "other-root" });
 	const A = makeNode({ id: "A", parentId: "root", nextSiblingId: "B", firstChildId: "A1", lastChildId: "A1" });
 	const B = makeNode({ id: "B", parentId: "root", prevSiblingId: "A", nextSiblingId: "C" });
 	const C = makeNode({ id: "C", parentId: "root", prevSiblingId: "B" });
@@ -31,6 +32,7 @@ function makeTree(): Map<string, CTNode> {
 
 	return new Map([
 		["root", root],
+		["other-root", otherRoot],
 		["A", A],
 		["B", B],
 		["C", C],
@@ -78,9 +80,10 @@ describe("getChildren", () => {
 });
 
 describe("getAllSiblingIds", () => {
-	it("returns [nodeId] for a root node (no parent)", () => {
+	it("returns all root ids for a root node", () => {
 		const nodes = makeTree();
-		expect(getAllSiblingIds(nodes.get("root")!, nodes)).toEqual(["root"]);
+		expect(getAllSiblingIds(nodes.get("root")!, nodes)).toEqual(["root", "other-root"]);
+		expect(getAllSiblingIds(nodes.get("other-root")!, nodes)).toEqual(["root", "other-root"]);
 	});
 
 	it("returns [nodeId] when parent is not found in the map", () => {
@@ -103,9 +106,10 @@ describe("getAllSiblingIds", () => {
 });
 
 describe("getSiblings", () => {
-	it("returns an empty array for a root node (no parent)", () => {
+	it("returns other root nodes as siblings for a root node", () => {
 		const nodes = makeTree();
-		expect(getSiblings(nodes.get("root")!, nodes)).toEqual([]);
+		expect(getSiblings(nodes.get("root")!, nodes).map((n) => n.id)).toEqual(["other-root"]);
+		expect(getSiblings(nodes.get("other-root")!, nodes).map((n) => n.id)).toEqual(["root"]);
 	});
 
 	it("returns an empty array when parent is not found in the map", () => {
