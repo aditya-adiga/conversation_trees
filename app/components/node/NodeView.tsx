@@ -79,19 +79,19 @@ export default function NodeView() {
 		onSwipeDown: () => { if (node) navigate(node.parentId); },
 		onSwipeLeft: () => {
 			if (!node || allSiblingIds.length <= 1) return;
-			const prev =
-				siblingIndex > 0
-					? allSiblingIds[siblingIndex - 1]
-					: allSiblingIds[allSiblingIds.length - 1];
-			navigate(prev);
-		},
-		onSwipeRight: () => {
-			if (!node || allSiblingIds.length <= 1) return;
 			const next =
 				siblingIndex < allSiblingIds.length - 1
 					? allSiblingIds[siblingIndex + 1]
 					: allSiblingIds[0];
 			navigate(next);
+		},
+		onSwipeRight: () => {
+			if (!node || allSiblingIds.length <= 1) return;
+			const prev =
+				siblingIndex > 0
+					? allSiblingIds[siblingIndex - 1]
+					: allSiblingIds[allSiblingIds.length - 1];
+			navigate(prev);
 		},
 	});
 
