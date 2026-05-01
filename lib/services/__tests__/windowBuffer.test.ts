@@ -25,6 +25,7 @@ import {
 
 const mockedSend = vi.mocked(openRouter.chat.send);
 const mockedCreateNode = vi.mocked(createNode);
+const MIN_CHUNKS_FOR_SEGMENTATION = 12;
 
 function makeChunk(words: string[], botId = "bot-1"): TranscriptDataEvent {
   return {
@@ -76,6 +77,16 @@ function makeLLMResponse(
   };
 }
 
+function accumulateChunks(
+  count = MIN_CHUNKS_FOR_SEGMENTATION,
+  prefix = "chunk",
+  botId = "bot-1",
+) {
+  for (let i = 1; i <= count; i += 1) {
+    accumulate(botId, makeChunk([`${prefix}${i}`], botId));
+  }
+}
+
 describe("windowBuffer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -102,6 +113,7 @@ describe("windowBuffer", () => {
 
       accumulate("bot-1", chunk1);
       accumulate("bot-1", chunk2);
+      accumulateChunks(10, "extra");
 
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse("accumulating") as never,
@@ -121,6 +133,8 @@ describe("windowBuffer", () => {
 
       accumulate("bot-1", chunkA);
       accumulate("bot-2", chunkB);
+      accumulateChunks(11, "bot-one-extra", "bot-1");
+      accumulateChunks(11, "bot-two-extra", "bot-2");
 
       mockedSend.mockResolvedValue(
         makeLLMResponse("accumulating") as never,
@@ -149,8 +163,18 @@ describe("windowBuffer", () => {
       expect(mockedSend).not.toHaveBeenCalled();
     });
 
+    it("should not call LLM before 12 transcript chunks have accumulated", async () => {
+      accumulateChunks(MIN_CHUNKS_FOR_SEGMENTATION - 1);
+
+      const result = await processWindow("bot-1");
+
+      expect(result).toBeUndefined();
+      expect(mockedSend).not.toHaveBeenCalled();
+      expect(mockedCreateNode).not.toHaveBeenCalled();
+    });
+
     it("should call LLM and return undefined when status is accumulating", async () => {
-      accumulate("bot-1", makeChunk(["some", "text"]));
+      accumulateChunks();
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse("accumulating") as never,
       );
@@ -162,15 +186,27 @@ describe("windowBuffer", () => {
       expect(mockedCreateNode).not.toHaveBeenCalled();
     });
 
+    it("should compact an accumulating batch so it does not rerun immediately", async () => {
+      accumulateChunks();
+      mockedSend.mockResolvedValueOnce(
+        makeLLMResponse("accumulating") as never,
+      );
+
+      await processWindow("bot-1");
+      await processWindow("bot-1");
+
+      expect(mockedSend).toHaveBeenCalledTimes(1);
+    });
+
     it("should create a node when LLM returns generated status", async () => {
-      accumulate("bot-1", makeChunk(["discussing", "architecture"]));
+      accumulateChunks();
       const nodePayload = {
         content: "discussing architecture",
         summary: "Architecture discussion",
         parentId: null,
       };
       mockedSend.mockResolvedValueOnce(
-        makeLLMResponse("generated", [nodePayload], 1) as never,
+        makeLLMResponse("generated", [nodePayload], MIN_CHUNKS_FOR_SEGMENTATION) as never,
       );
       const fakeNode = {
         id: "node-uuid-1",
@@ -188,20 +224,19 @@ describe("windowBuffer", () => {
       expect(mockedCreateNode).toHaveBeenCalledWith(nodePayload);
     });
 
-    it("should advance the cursor by chunksConsumed after generating a node", async () => {
-      accumulate("bot-1", makeChunk(["chunk1"]));
-      accumulate("bot-1", makeChunk(["chunk2"]));
+    it("should remove fully consumed chunks before the next LLM call", async () => {
+      accumulateChunks(MIN_CHUNKS_FOR_SEGMENTATION, "first");
 
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse(
           "generated",
-          [{ content: "chunk1 chunk2", summary: "First node", parentId: null }],
-          2,
+          [{ content: "first batch", summary: "First node", parentId: null }],
+          MIN_CHUNKS_FOR_SEGMENTATION,
         ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
         id: "node-1",
-        content: "chunk1 chunk2",
+        content: "first batch",
         summary: "First node",
         parentId: null,
         prevSiblingId: null,
@@ -212,7 +247,7 @@ describe("windowBuffer", () => {
 
       await processWindow("bot-1");
 
-      accumulate("bot-1", makeChunk(["chunk3"]));
+      accumulateChunks(MIN_CHUNKS_FOR_SEGMENTATION, "second");
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse("accumulating") as never,
       );
@@ -223,18 +258,16 @@ describe("windowBuffer", () => {
         mockedSend.mock.calls[1][0].chatGenerationParams.messages[0].content;
       const lines = fullPrompt.trimEnd().split("\n");
       const lastLine = lines[lines.length - 1].trim();
-      expect(lastLine).toBe("[1] chunk3");
+      expect(lastLine).toBe("[12] second12");
       // Only check numbered chunk lines (not tree context which may reference node content)
       const chunkLines = lines.filter((l: string) => /^\[\d+\]/.test(l.trim()));
-      expect(chunkLines.filter((l: string) => l.includes("chunk1") || l.includes("chunk2"))).toHaveLength(0);
+      expect(chunkLines.filter((l: string) => l.includes("first"))).toHaveLength(0);
     });
 
-    it("should only advance cursor by chunksConsumed, leaving remaining chunks for next call", async () => {
-      accumulate("bot-1", makeChunk(["chunk1"]));
-      accumulate("bot-1", makeChunk(["chunk2"]));
-      accumulate("bot-1", makeChunk(["chunk3"]));
+    it("should compact unconsumed chunks into one chunk for the next batch", async () => {
+      accumulateChunks();
 
-      // LLM uses only the first 2 of 3 chunks
+      // LLM uses only the first two chunks, leaving the rest as carryover.
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse(
           "generated",
@@ -255,6 +288,7 @@ describe("windowBuffer", () => {
 
       await processWindow("bot-1");
 
+      accumulateChunks(MIN_CHUNKS_FOR_SEGMENTATION - 1, "next");
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse("accumulating") as never,
       );
@@ -263,21 +297,28 @@ describe("windowBuffer", () => {
       const prompt =
         mockedSend.mock.calls[1][0].chatGenerationParams.messages[0].content;
       const lines = prompt.trimEnd().split("\n");
-      // chunk3 is the only remaining chunk, numbered [1]
-      expect(lines.some((l: string) => l.trim() === "[1] chunk3")).toBe(true);
+      // Remaining chunks from the processed batch are merged into one numbered item.
+      expect(
+        lines.some((l: string) =>
+          l.trim().startsWith("[1] chunk3 chunk4 chunk5"),
+        ),
+      ).toBe(true);
       // Only check numbered chunk lines (not tree context which may reference node content)
       const chunkLines = lines.filter((l: string) => /^\[\d+\]/.test(l.trim()));
-      expect(chunkLines.filter((l: string) => l.includes("chunk1") || l.includes("chunk2"))).toHaveLength(0);
+      expect(
+        chunkLines.filter(
+          (l: string) => /\bchunk1\b|\bchunk2\b/.test(l),
+        ),
+      ).toHaveLength(0);
     });
 
     it("should create multiple nodes when LLM returns more than one", async () => {
-      accumulate("bot-1", makeChunk(["topic", "one"]));
-      accumulate("bot-1", makeChunk(["topic", "two"]));
+      accumulateChunks();
 
       const nodeA = { content: "topic one", summary: "Topic A", parentId: null };
       const nodeB = { content: "topic two", summary: "Topic B", parentId: null };
       mockedSend.mockResolvedValueOnce(
-        makeLLMResponse("generated", [nodeA, nodeB], 2) as never,
+        makeLLMResponse("generated", [nodeA, nodeB], MIN_CHUNKS_FOR_SEGMENTATION) as never,
       );
       const fakeNodeA = {
         id: "node-a",
@@ -308,15 +349,14 @@ describe("windowBuffer", () => {
     });
 
     it("should resolve parentBatchIndex for intra-batch parent references", async () => {
-      accumulate("bot-1", makeChunk(["parent", "topic"]));
-      accumulate("bot-1", makeChunk(["child", "subtopic"]));
+      accumulateChunks();
 
       const nodeSpecs = [
         { content: "parent topic", summary: "Parent", parentId: null, parentBatchIndex: null },
         { content: "child subtopic", summary: "Child", parentId: null, parentBatchIndex: 0 },
       ];
       mockedSend.mockResolvedValueOnce(
-        makeLLMResponse("generated", nodeSpecs, 2) as never,
+        makeLLMResponse("generated", nodeSpecs, MIN_CHUNKS_FOR_SEGMENTATION) as never,
       );
       const fakeParent = {
         id: "parent-id",
@@ -359,12 +399,12 @@ describe("windowBuffer", () => {
     });
 
     it("should include tree context from previously generated nodes", async () => {
-      accumulate("bot-1", makeChunk(["first", "topic"]));
+      accumulateChunks(MIN_CHUNKS_FOR_SEGMENTATION, "first");
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse(
           "generated",
           [{ content: "first topic", summary: "Topic one", parentId: null }],
-          1,
+          MIN_CHUNKS_FOR_SEGMENTATION,
         ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
@@ -379,7 +419,7 @@ describe("windowBuffer", () => {
       });
       await processWindow("bot-1");
 
-      accumulate("bot-1", makeChunk(["second", "topic"]));
+      accumulateChunks(MIN_CHUNKS_FOR_SEGMENTATION, "second");
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse("accumulating") as never,
       );
@@ -393,7 +433,9 @@ describe("windowBuffer", () => {
     });
 
     it("should skip LLM call when buffer has only empty/whitespace chunks", async () => {
-      accumulate("bot-1", makeChunk(["", " "]));
+      for (let i = 0; i < MIN_CHUNKS_FOR_SEGMENTATION; i += 1) {
+        accumulate("bot-1", makeChunk(["", " "]));
+      }
 
       const result = await processWindow("bot-1");
 
@@ -402,7 +444,7 @@ describe("windowBuffer", () => {
     });
 
     it("should handle LLM response wrapped in markdown code fences", async () => {
-      accumulate("bot-1", makeChunk(["hello"]));
+      accumulateChunks();
       const nodePayload = {
         content: "hello",
         summary: "Greeting",
@@ -433,7 +475,7 @@ describe("windowBuffer", () => {
     });
 
     it("should not crash when LLM returns invalid JSON", async () => {
-      accumulate("bot-1", makeChunk(["hello"]));
+      accumulateChunks();
       mockedSend.mockResolvedValueOnce({
         choices: [{ message: { content: "not json at all" } }],
       } as never);
@@ -444,7 +486,7 @@ describe("windowBuffer", () => {
     });
 
     it("should not crash when LLM response fails schema validation", async () => {
-      accumulate("bot-1", makeChunk(["hello"]));
+      accumulateChunks();
       mockedSend.mockResolvedValueOnce({
         choices: [
           {
@@ -461,7 +503,7 @@ describe("windowBuffer", () => {
     });
 
     it("should deduplicate concurrent calls via inflight guard", async () => {
-      accumulate("bot-1", makeChunk(["hello"]));
+      accumulateChunks();
       mockedSend.mockResolvedValue(
         makeLLMResponse("accumulating") as never,
       );
@@ -552,7 +594,7 @@ describe("windowBuffer", () => {
 
   describe("drainAndCleanup", () => {
     it("should wait for pending processWindow calls then cleanup", async () => {
-      accumulate("bot-1", makeChunk(["pending", "work"]));
+      accumulateChunks(MIN_CHUNKS_FOR_SEGMENTATION, "pending");
 
       let resolveOuter!: () => void;
       const blockingPromise = new Promise<void>((r) => {

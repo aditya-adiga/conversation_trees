@@ -1,6 +1,9 @@
 import { BotCreation } from "@/lib/types/event";
 import { validateEnv } from "@/lib/api/utils";
 import { CreateBotRequestSchema } from "@/lib/schemas/event";
+import { emitter } from "@/lib/emitter/emitter";
+import { replaceCurrentBot } from "@/lib/db/streamSessions";
+import { stopRecallBot } from "@/lib/services/recallBotService";
 
 export async function POST(request: Request) {
   const envError = validateEnv();
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
       },
     );
 
-    const data: BotCreation = await response.json();
+    const data: BotCreation & { id?: string } = await response.json();
 
     if (response.status >= 500) {
       console.error(data);
@@ -61,6 +64,21 @@ export async function POST(request: Request) {
         { error: "Bad request" },
         { status: response.status },
       );
+    }
+
+    if (data.id) {
+      const previousBotId = replaceCurrentBot(body.clientSessionId, data.id);
+
+      if (previousBotId) {
+        emitter.emit(`${previousBotId}:close`);
+        stopRecallBot(previousBotId).then((result) => {
+          if (!result.ok) {
+            console.warn(
+              `[CreateBot:${data.id}] stopRecallBot failed for previous bot ${previousBotId}: ${result.error}`,
+            );
+          }
+        });
+      }
     }
 
     return Response.json(data, { status: 201 });
