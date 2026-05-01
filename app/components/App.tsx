@@ -14,6 +14,17 @@ import {
 	createSessionActions,
 } from "./session/sessionActions";
 
+const CLIENT_SESSION_STORAGE_KEY = "conversationTrees.clientSessionId";
+
+function getClientSessionId() {
+	const existing = sessionStorage.getItem(CLIENT_SESSION_STORAGE_KEY);
+	if (existing) return existing;
+
+	const id = crypto.randomUUID();
+	sessionStorage.setItem(CLIENT_SESSION_STORAGE_KEY, id);
+	return id;
+}
+
 export default function App() {
 	const { addNode, nodes, reset } = useNavigation();
 	const [appState, setAppState] = useState<AppState>("idle");
@@ -69,7 +80,10 @@ export default function App() {
 				const res = await fetch("/api/recall/create-bot", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ url: input.url }),
+					body: JSON.stringify({
+						url: input.url,
+						clientSessionId: getClientSessionId(),
+					}),
 				});
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? "Failed to create bot");

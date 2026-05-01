@@ -19,7 +19,10 @@ const TERMINAL_EVENTS = ["bot.done", "bot.fatal"];
 const receivedCounts = new Map<string, number>();
 
 function dispatch(botId: string, payload: Parameters<typeof emitter.emit>[1]) {
-  if (isConnected(botId)) {
+  const connected = isConnected(botId);
+  console.log(`[Dispatch:${botId}] connected=${connected}`);
+
+  if (connected) {
     emitter.emit(botId, payload);
   } else {
     updateQueue(botId, payload);
