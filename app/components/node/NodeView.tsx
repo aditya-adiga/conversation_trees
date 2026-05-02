@@ -8,7 +8,11 @@ import { useEffect, useMemo, useRef } from "react";
 import { useSwipe } from "@/lib/hooks/useSwipe";
 import NeighbourCard from "./NeighbourCard";
 
-export default function NodeView() {
+interface NodeViewProps {
+	onOpenTranscript?: () => void;
+}
+
+export default function NodeView({ onOpenTranscript }: NodeViewProps) {
 	const { currentNodeId, latestNodeId, nodes, navigate } = useNavigation();
 
 	const node = currentNodeId ? nodes.get(currentNodeId) : undefined;
@@ -159,7 +163,7 @@ export default function NodeView() {
 					<div className={`w-full max-w-2xl rounded-2xl border p-6 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)] sm:p-10 ${node.id === latestNodeId ? "border-[var(--latest)] bg-[var(--latest-bg)]" : "border-[var(--border)] bg-white"}`}>
 						<div className="mb-4 flex items-start gap-3">
 							<h2 className="flex-1 font-serif text-xl font-semibold tracking-tight text-[var(--text-heading)] sm:text-2xl">
-								{node.summary || "Untitled"}
+								{node.name || "Untitled"}
 							</h2>
 							{node.id === latestNodeId && (
 								<span className="mt-1.5 flex shrink-0 items-center gap-1 text-xs text-[var(--text-muted)]">
@@ -176,7 +180,17 @@ export default function NodeView() {
 									Jump to latest
 								</button>
 							)}
+							{onOpenTranscript && (
+								<button
+									type="button"
+									onClick={onOpenTranscript}
+									className="mt-0.5 shrink-0 rounded-full border border-[var(--border)] bg-white px-3 py-1 text-xs font-medium text-[var(--text-muted)] transition-colors hover:border-[var(--text-muted)] hover:text-[var(--text-body)]"
+								>
+									Transcript
+								</button>
+							)}
 						</div>
+						<p className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">Summary</p>
 						<p ref={contentRef} className="max-h-52 overflow-y-auto text-[15px] leading-relaxed text-[var(--text-body)] sm:max-h-96">
 							{node.content}
 						</p>

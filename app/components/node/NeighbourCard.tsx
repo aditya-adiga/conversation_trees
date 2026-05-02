@@ -37,7 +37,7 @@ export default function NeighbourCard({
 					{directionHint[direction]}
 				</span>
 				<h3 className="truncate font-serif text-sm font-semibold tracking-tight text-[var(--text-heading)]">
-					{node.summary || "Untitled"}
+					{node.name || "Untitled"}
 				</h3>
 				{isLatest && (
 					<span className="ml-auto shrink-0 h-1.5 w-1.5 rounded-full bg-[var(--latest)] animate-pulse" />
