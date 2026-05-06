@@ -31,7 +31,7 @@ export default function SessionControls({
             disabled={!canStopBot}
             className="rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isStopping ? "Stopping..." : "Stop bot"}
+            {isStopping ? "Stopping..." : "Stop"}
           </button>
         )}
         <button

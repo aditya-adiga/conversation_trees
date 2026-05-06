@@ -90,6 +90,15 @@ export default function App() {
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? "Failed to create bot");
 				id = data.id;
+			} else if (input.type === "youtube") {
+				const res = await fetch("/api/process-youtube", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ url: input.url }),
+				});
+				const data = await res.json();
+				if (!res.ok) throw new Error(data.error ?? "Failed to process YouTube video");
+				id = data.botId;
 			} else {
 				const res = await fetch("/api/process-text", {
 					method: "POST",
@@ -139,7 +148,7 @@ export default function App() {
 				<>
 					<SessionControls
 						statusText={statusText}
-						showStopBot={sessionSource === "url"}
+						showStopBot={sessionSource === "url" || sessionSource === "youtube"}
 						canStopBot={canStopBot}
 						isStopping={appState === "stopping"}
 						onHome={handleHome}
@@ -152,7 +161,7 @@ export default function App() {
 					<div className="relative flex-1 overflow-hidden">
 						<SessionControls
 							statusText={statusText}
-							showStopBot={sessionSource === "url"}
+							showStopBot={sessionSource === "url" || sessionSource === "youtube"}
 							canStopBot={canStopBot}
 							isStopping={appState === "stopping"}
 							onHome={handleHome}

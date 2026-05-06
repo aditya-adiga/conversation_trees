@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 
-type Tab = "url" | "text";
+type Tab = "url" | "youtube" | "text";
 
 export type InputPayload =
 	| { type: "url"; url: string }
+	| { type: "youtube"; url: string }
 	| { type: "text"; text: string };
 
 interface InputViewProps {
@@ -16,12 +17,14 @@ interface InputViewProps {
 
 const tabLabel: Record<Tab, string> = {
 	url: "Google Meet",
+	youtube: "YouTube",
 	text: "Paste Text",
 };
 
 export default function InputView({ onSubmit, status, error }: InputViewProps) {
 	const [tab, setTab] = useState<Tab>("url");
 	const [url, setUrl] = useState("");
+	const [youtubeUrl, setYoutubeUrl] = useState("");
 	const [text, setText] = useState("");
 
 	const isLoading = status === "connecting";
@@ -30,6 +33,8 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 		e.preventDefault();
 		if (tab === "url") {
 			onSubmit({ type: "url", url: url.trim() });
+		} else if (tab === "youtube") {
+			onSubmit({ type: "youtube", url: youtubeUrl.trim() });
 		} else {
 			onSubmit({ type: "text", text: text.trim() });
 		}
@@ -48,7 +53,7 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 
 				{/* Tab toggle */}
 				<div className="mb-6 flex gap-1 rounded-xl bg-[var(--background)] p-1">
-					{(["url", "text"] as Tab[]).map((t) => (
+					{(["url", "youtube", "text"] as Tab[]).map((t) => (
 						<button
 							key={t}
 							type="button"
@@ -72,6 +77,15 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 							placeholder="https://meet.google.com/abc-defg-hij"
 							value={url}
 							onChange={(e) => setUrl(e.target.value)}
+							required
+							className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
+						/>
+					) : tab === "youtube" ? (
+						<input
+							type="url"
+							placeholder="https://www.youtube.com/watch?v=..."
+							value={youtubeUrl}
+							onChange={(e) => setYoutubeUrl(e.target.value)}
 							required
 							className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
 						/>
