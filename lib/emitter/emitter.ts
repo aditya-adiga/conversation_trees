@@ -1,3 +1,8 @@
 import { EventEmitter } from "events";
 
-export const emitter = new EventEmitter()
+const globalForEmitter = globalThis as typeof globalThis & {
+  __conversationTreeEmitter?: EventEmitter;
+};
+
+export const emitter =
+  globalForEmitter.__conversationTreeEmitter ??= new EventEmitter();

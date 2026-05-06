@@ -86,9 +86,9 @@ export async function PUT(
       );
     }
 
-    const { summary, content } = validationResult.data;
+    const { name, content, transcript } = validationResult.data;
 
-    const node = updateNode(id, { ...existing, content, summary });
+    const node = updateNode(id, { ...existing, name, content, transcript });
 
     return Response.json(node, { status: 200 });
   } catch (e) {

@@ -56,8 +56,9 @@ export const TranscriptDataEventSchema = z.object({
 
 export const BufferNodeSchema = z.object({
   id: z.string().uuid(),
+  name: z.string(),
   content: z.string(),
-  summary: z.string(),
+  transcript: z.string(),
   parentId: z.string().uuid().nullable(),
 });
 
@@ -81,4 +82,5 @@ export const BotCreationSchema = z.object({
 
 export const CreateBotRequestSchema = z.object({
   url: z.url(),
+  clientSessionId: z.uuid(),
 });

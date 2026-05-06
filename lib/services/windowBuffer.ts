@@ -61,8 +61,9 @@ const PROMPT = `
     "status": "generated/accumulating",
     "nodes": [
       {
-        "content": "Copy verbatim ALL words from every chunk this node covers, in order. Do not skip, paraphrase, or omit any words.",
-        "summary": "Short gist of the insight",
+        "name": "Short node title — 1 sentence naming the topic (used as the heading)",
+        "content": "Brief analytical summary of what was discussed and concluded — keep it concise.",
+        "transcript": "Copy verbatim ALL words from every chunk this node covers, in order. Do not skip, paraphrase, or omit any words.",
         "parentId": "UUID of an existing parent node, or null if this is the first node",
         "parentBatchIndex": null
       }
@@ -75,10 +76,12 @@ const PROMPT = `
 
 const FORCE_NOTE =
   '\n\nIMPORTANT: This is the final chunk of the conversation. You MUST generate a node now — do not return "accumulating".';
+const MIN_CHUNKS_FOR_SEGMENTATION = 12;
 
 const LLMNodeSchema = z.object({
+  name: z.string(),
   content: z.string(),
-  summary: z.string(),
+  transcript: z.string(),
   parentId: z.string().uuid().nullable(),
   parentBatchIndex: z.number().int().min(0).nullable().optional(),
 });
@@ -129,8 +132,13 @@ export function accumulate(
   });
 }
 
-function prepareChunks(buffer: BotBuffer) {
-  const window = buffer.chunks.slice(buffer.cursor);
+function prepareChunks(buffer: BotBuffer, opts: { force?: boolean } = {}) {
+  const window = opts.force
+    ? buffer.chunks.slice(buffer.cursor)
+    : buffer.chunks.slice(
+        buffer.cursor,
+        buffer.cursor + MIN_CHUNKS_FOR_SEGMENTATION,
+      );
   const windowSize = window.length;
   const texts = window.map((chunk) =>
     chunk.data.data.words.map((word) => word.text).join(" "),
@@ -141,6 +149,52 @@ function prepareChunks(buffer: BotBuffer) {
     .join("\n");
 
   return { accumulated_context, windowSize, hasContent };
+}
+
+function mergeChunks(chunks: TranscriptDataEvent[]): TranscriptDataEvent | null {
+  if (chunks.length === 0) return null;
+
+  const [first] = chunks;
+
+  return {
+    ...first,
+    data: {
+      ...first.data,
+      data: {
+        ...first.data.data,
+        words: chunks.flatMap((chunk) => chunk.data.data.words),
+      },
+    },
+  };
+}
+
+function compactProcessedWindow(
+  botId: string,
+  buffer: BotBuffer,
+  windowSize: number,
+  chunksConsumed: number,
+  newNodes: BotBuffer["nodes"] = [],
+) {
+  const current = windowBuffer.get(botId);
+  if (!current) return;
+
+  const processedWindowEnd = buffer.cursor + windowSize;
+  const remainingFromProcessedWindow = buffer.chunks.slice(
+    buffer.cursor + chunksConsumed,
+    processedWindowEnd,
+  );
+  const newArrivals = current.chunks.slice(processedWindowEnd);
+  const mergedRemaining = mergeChunks(remainingFromProcessedWindow);
+
+  console.log(
+    `[WindowBuffer:${botId}] Compacting processed window: windowSize=${windowSize}, chunksConsumed=${chunksConsumed}, remainingFromWindow=${remainingFromProcessedWindow.length}, newArrivals=${newArrivals.length}, mergedRemaining=${mergedRemaining ? 1 : 0}`,
+  );
+
+  windowBuffer.set(botId, {
+    chunks: mergedRemaining ? [mergedRemaining, ...newArrivals] : newArrivals,
+    cursor: 0,
+    nodes: [...current.nodes, ...newNodes],
+  });
 }
 
 export function cleanupBuffer(botId: string) {
@@ -178,7 +232,7 @@ function buildTreeContext(nodes: BotBuffer["nodes"]): string {
 
   function render(parentId: string | null, indent: string) {
     for (const n of childrenMap.get(parentId) ?? []) {
-      lines.push(`${indent}[${n.id}] ${n.summary}`);
+      lines.push(`${indent}[${n.id}] ${n.name}`);
       render(n.id, `${indent}  `);
     }
   }
@@ -189,7 +243,7 @@ function buildTreeContext(nodes: BotBuffer["nodes"]): string {
   return (
     `\n\nCurrent conversation tree (indented = child of the node above it):` +
     `\n${lines.join("\n")}` +
-    `\n\nMost recently added node: [${last.id}] "${last.summary}"\n`
+    `\n\nMost recently added node: [${last.id}] "${last.name}"\n`
   );
 }
 
@@ -230,12 +284,20 @@ async function processWindowInner(
 
   if (!buffer) return;
 
-  const { accumulated_context, windowSize, hasContent } = prepareChunks(buffer);
+  const { accumulated_context, windowSize, hasContent } = prepareChunks(
+    buffer,
+    opts,
+  );
 
   if (!windowSize || !hasContent) return;
+  if (!opts.force && windowSize < MIN_CHUNKS_FOR_SEGMENTATION) return;
 
   try {
     const treeContext = buildTreeContext(buffer.nodes);
+
+    console.log(
+      `[WindowBuffer:${botId}] Processing window: windowSize=${windowSize}, force=${Boolean(opts.force)}`,
+    );
 
     const completion = await openRouter.chat.send({
       chatGenerationParams: {
@@ -253,12 +315,19 @@ async function processWindowInner(
     const raw = completion.choices[0].message.content;
     const response = LLMResponseSchema.parse(JSON.parse(stripCodeFences(raw)));
 
+    console.log(
+      `[WindowBuffer:${botId}] LLM response: status=${response.status}, nodes=${response.nodes.length}, chunksConsumed=${response.chunksConsumed}`,
+    );
+
     if (response.status === "accumulating" || response.nodes.length === 0) {
+      compactProcessedWindow(botId, buffer, windowSize, 0);
       return;
     }
 
     if (!hasValidParents(response.nodes)) {
-      console.log(`[WindowBuffer:${botId}] Skipping batch — one or more parentIds not found`);
+      console.log(
+        `[WindowBuffer:${botId}] Skipping batch — one or more parentIds not found`,
+      );
       return;
     }
 
@@ -273,14 +342,16 @@ async function processWindowInner(
           : spec.parentId;
 
       const node = createNode({
+        name: spec.name,
         content: spec.content,
-        summary: spec.summary,
+        transcript: spec.transcript,
         parentId: resolvedParentId,
       });
       bufferNodes.push({
         id: node.id,
+        name: spec.name,
         content: spec.content,
-        summary: spec.summary,
+        transcript: spec.transcript,
         parentId: resolvedParentId,
       });
       createdNodes.push(node);
@@ -292,12 +363,13 @@ async function processWindowInner(
         ? Math.min(response.chunksConsumed, windowSize)
         : windowSize;
 
-    const current = windowBuffer.get(botId)!;
-    windowBuffer.set(botId, {
-      chunks: current.chunks,
-      cursor: buffer.cursor + chunksConsumed,
-      nodes: [...current.nodes, ...bufferNodes],
-    });
+    compactProcessedWindow(
+      botId,
+      buffer,
+      windowSize,
+      chunksConsumed,
+      bufferNodes,
+    );
 
     return createdNodes;
   } catch (_e) {

@@ -1,7 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { GET } from "../route";
 import { update, flush, unregisterConnection } from "@/lib/db/eventQueue";
 import { EventData } from "@/lib/types/event";
+
+vi.mock("@/lib/services/recallBotService", () => ({
+  stopRecallBot: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
+import * as recallBotService from "@/lib/services/recallBotService";
 
 const BOT_ID = "bot-456";
 
@@ -18,6 +24,7 @@ describe("GET /api/recall/stream/:botId", () => {
   beforeEach(() => {
     flush(BOT_ID);
     unregisterConnection(BOT_ID);
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -57,5 +64,25 @@ describe("GET /api/recall/stream/:botId", () => {
     const payload2 = JSON.parse(chunk2.replace(/^data: /, "").trim());
     expect(payload1).toEqual(event1);
     expect(payload2).toEqual(event2);
+  });
+
+  it("calls stopRecallBot when the client aborts", async () => {
+    const flushPromises = () =>
+      new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    const abortController = new AbortController();
+    const request = new Request(
+      `http://localhost/api/recall/stream/${BOT_ID}`,
+      { signal: abortController.signal },
+    );
+
+    await GET(request, { params: Promise.resolve({ botId: BOT_ID }) });
+
+    abortController.abort();
+    await flushPromises();
+
+    expect(vi.mocked(recallBotService.stopRecallBot)).toHaveBeenCalledWith(
+      BOT_ID,
+    );
   });
 });
