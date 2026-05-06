@@ -19,7 +19,7 @@ const nodes = new Map<string, CTNode>([
 			id: ROOT,
 			content:
 				"This is the root of the conversation. It sets up the initial context and framing for everything that follows. Think of it as the trunk of a tree from which all branches grow.",
-			summary: "Root — the starting point",
+			name: "Root — the starting point",
 			parentId: null,
 			prevSiblingId: null,
 			nextSiblingId: null,
@@ -33,7 +33,7 @@ const nodes = new Map<string, CTNode>([
 			id: CHILD_A,
 			content:
 				"Branch A takes the original premise and pushes it in one particular direction, examining the implications carefully.",
-			summary: "Branch A — first direction",
+			name: "Branch A — first direction",
 			parentId: ROOT,
 			prevSiblingId: null,
 			nextSiblingId: CHILD_B,
@@ -47,7 +47,7 @@ const nodes = new Map<string, CTNode>([
 			id: CHILD_B,
 			content:
 				"Branch B takes a different angle. Rather than following the path of Branch A, it considers an alternative interpretation and builds on that instead.",
-			summary: "Branch B — alternative angle",
+			name: "Branch B — alternative angle",
 			parentId: ROOT,
 			prevSiblingId: CHILD_A,
 			nextSiblingId: CHILD_C,
@@ -61,7 +61,7 @@ const nodes = new Map<string, CTNode>([
 			id: CHILD_C,
 			content:
 				"Branch C is the third perspective. It synthesises elements from the previous branches while introducing a new consideration that neither addressed.",
-			summary: "Branch C — synthesis",
+			name: "Branch C — synthesis",
 			parentId: ROOT,
 			prevSiblingId: CHILD_B,
 			nextSiblingId: null,
@@ -75,7 +75,7 @@ const nodes = new Map<string, CTNode>([
 			id: CHILD_A1,
 			content:
 				"A deeper elaboration on Branch A. This node digs into the specifics and provides concrete examples to support the direction taken above.",
-			summary: "A1 — deeper into Branch A",
+			name: "A1 — deeper into Branch A",
 			parentId: CHILD_A,
 			prevSiblingId: null,
 			nextSiblingId: null,
@@ -89,7 +89,7 @@ const nodes = new Map<string, CTNode>([
 			id: CHILD_B1,
 			content:
 				"The first sub-branch of B. It picks up the alternative interpretation and tests it against a specific scenario to see how well it holds.",
-			summary: "B1 — testing the alternative",
+			name: "B1 — testing the alternative",
 			parentId: CHILD_B,
 			prevSiblingId: null,
 			nextSiblingId: CHILD_B2,
@@ -103,7 +103,7 @@ const nodes = new Map<string, CTNode>([
 			id: CHILD_B2,
 			content:
 				"The second sub-branch of B. It challenges the first sub-branch and proposes a refinement that accounts for edge cases.",
-			summary: "B2 — refinement of B1",
+			name: "B2 — refinement of B1",
 			parentId: CHILD_B,
 			prevSiblingId: CHILD_B1,
 			nextSiblingId: null,
@@ -117,7 +117,7 @@ const nodes = new Map<string, CTNode>([
 			id: CHILD_C1,
 			content:
 				"A continuation of the synthesis from Branch C. It wraps together the insights gathered so far and points toward a possible conclusion.",
-			summary: "C1 — toward a conclusion",
+			name: "C1 — toward a conclusion",
 			parentId: CHILD_C,
 			prevSiblingId: null,
 			nextSiblingId: null,
