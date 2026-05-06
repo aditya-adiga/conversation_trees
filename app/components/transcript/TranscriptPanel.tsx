@@ -23,6 +23,20 @@ export default function TranscriptPanel({
 	const [syncToLatest, setSyncToLatest] = useState(false);
 	const highlightedRef = useRef<HTMLDivElement>(null);
 	const prevLatestRef = useRef<string | null>(null);
+	const isOpenRef = useRef(isOpen);
+
+	useEffect(() => {
+		isOpenRef.current = isOpen;
+	}, [isOpen]);
+
+	const [prevCurrentNodeId, setPrevCurrentNodeId] = useState(currentNodeId);
+
+	if (prevCurrentNodeId !== currentNodeId) {
+		setPrevCurrentNodeId(currentNodeId);
+		if (syncToLatest && currentNodeId !== latestNodeId) {
+			setSyncToLatest(false);
+		}
+	}
 
 	// Auto-navigate to latest node when sync is on and a new node arrives
 	useEffect(() => {
@@ -34,15 +48,15 @@ export default function TranscriptPanel({
 	}, [syncToLatest, latestNodeId, onNavigate]);
 
 	useEffect(() => {
-		if (syncToLatest && currentNodeId !== latestNodeId) {
-			queueMicrotask(() => {
-				setSyncToLatest(false);
-			});
-		}
-	}, [currentNodeId]);
+		if (!isOpen) return;
+		const timer = setTimeout(() => {
+			highlightedRef.current?.scrollIntoView({ behavior: "instant", block: "center" });
+		}, 300);
+		return () => clearTimeout(timer);
+	}, [isOpen]);
 
-	// Scroll highlighted segment into view when current node changes
 	useEffect(() => {
+		if (!isOpenRef.current) return;
 		highlightedRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
 	}, [currentNodeId]);
 
