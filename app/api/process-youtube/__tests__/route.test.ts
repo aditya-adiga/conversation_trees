@@ -116,7 +116,31 @@ describe("POST /api/process-youtube", () => {
     await flushPromises();
 
     expect(mockedProcessYouTube).toHaveBeenCalledOnce();
-    expect(mockedProcessYouTube).toHaveBeenCalledWith(YOUTUBE_URL, botId);
+    expect(mockedProcessYouTube).toHaveBeenCalledWith(YOUTUBE_URL, botId, "long");
+  });
+
+  it("defaults chunkPreset to 'long' when not provided", async () => {
+    const res = await POST(makeRequest({ url: YOUTUBE_URL }));
+    const { botId } = await res.json();
+    await flushPromises();
+
+    expect(mockedProcessYouTube).toHaveBeenCalledWith(YOUTUBE_URL, botId, "long");
+  });
+
+  it("passes through a valid chunkPreset from the request body", async () => {
+    const res = await POST(makeRequest({ url: YOUTUBE_URL, chunkPreset: "medium" }));
+    const { botId } = await res.json();
+    await flushPromises();
+
+    expect(mockedProcessYouTube).toHaveBeenCalledWith(YOUTUBE_URL, botId, "medium");
+  });
+
+  it("falls back to 'long' for an invalid chunkPreset", async () => {
+    const res = await POST(makeRequest({ url: YOUTUBE_URL, chunkPreset: "bogus" }));
+    const { botId } = await res.json();
+    await flushPromises();
+
+    expect(mockedProcessYouTube).toHaveBeenCalledWith(YOUTUBE_URL, botId, "long");
   });
 
   it("does not crash the server when processYouTube rejects", async () => {

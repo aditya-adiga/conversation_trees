@@ -101,7 +101,7 @@ export default function App() {
 				const res = await fetch("/api/process-youtube", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ url: input.url }),
+					body: JSON.stringify({ url: input.url, chunkPreset: input.chunkPreset }),
 				});
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? "Failed to process YouTube video");

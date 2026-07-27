@@ -1,16 +1,6 @@
 import { YoutubeTranscript } from "youtube-transcript";
-import { emitter } from "@/lib/emitter/emitter";
-import { isConnected } from "@/lib/db/eventQueue";
-import { updateQueue } from "@/lib/services/eventsQueueProcessor";
-import {
-  accumulate,
-  processWindow,
-  forceFlush,
-  drainAndCleanup,
-} from "@/lib/services/windowBuffer";
-import type { TranscriptDataEvent } from "@/lib/types/event";
-
-const WORDS_PER_CHUNK = 100;
+import { processWordsInChunks } from "@/lib/services/wordChunkProcessor";
+import type { ChunkPreset } from "@/lib/constants/chunking";
 
 const cancelledSessions = new Set<string>();
 
@@ -31,83 +21,24 @@ function extractVideoId(url: string): string {
   throw new Error("Could not extract video ID from URL");
 }
 
-function dispatch(botId: string, payload: unknown) {
-  if (isConnected(botId)) {
-    emitter.emit(botId, payload);
-  } else {
-    updateQueue(botId, payload);
-  }
-}
-
-function makeChunkEvent(botId: string, words: string[], now: string): TranscriptDataEvent {
-  return {
-    event: "transcript.data",
-    data: {
-      data: {
-        words: words.map((word) => ({
-          text: word,
-          start_timestamp: { relative: 0, absolute: now },
-          end_timestamp: { relative: 0, absolute: now },
-        })),
-        participant: {
-          id: 0,
-          name: "YouTube",
-          is_host: true,
-          platform: "youtube",
-          extra_data: {},
-        },
-      },
-      transcript: { id: botId, metadata: {} },
-      realtime_endpoint: { id: botId, metadata: {} },
-      recording: { id: botId, metadata: {} },
-      bot: { id: botId, metadata: {} },
-    },
-  };
-}
-
-export async function processYouTube(url: string, botId: string): Promise<void> {
+export async function processYouTube(
+  url: string,
+  botId: string,
+  chunkPreset: ChunkPreset = "long",
+): Promise<void> {
   const videoId = extractVideoId(url);
   const segments = await YoutubeTranscript.fetchTranscript(videoId);
 
-  const now = new Date().toISOString();
   const words = segments.flatMap((seg) =>
     seg.text.trim().split(/\s+/).filter(Boolean),
   );
 
-  for (let i = 0; i < words.length; i += WORDS_PER_CHUNK) {
-    if (cancelledSessions.has(botId)) break;
-    const chunk = words.slice(i, i + WORDS_PER_CHUNK);
-    accumulate(botId, makeChunkEvent(botId, chunk, now));
-    const nodes = await processWindow(botId);
-    if (nodes) {
-      for (const node of nodes) {
-        dispatch(botId, { node });
-      }
-    }
-  }
-
-  const cancelled = cancelledSessions.has(botId);
-  cancelledSessions.delete(botId);
-
-  if (!cancelled) {
-    const remaining = await forceFlush(botId);
-    if (remaining) {
-      for (const node of remaining) {
-        dispatch(botId, { node });
-      }
-    }
-  }
-
-  await drainAndCleanup(botId);
-
-  if (!cancelled) {
-    dispatch(botId, {
-      eventData: {
-        event: "bot.done",
-        data: { bot: { id: botId, metadata: {} } },
-      },
-    });
-  }
-
-  emitter.emit(`${botId}:close`);
+  await processWordsInChunks({
+    botId,
+    words,
+    chunkPreset,
+    participant: { name: "YouTube", platform: "youtube" },
+    isCancelled: (id) => cancelledSessions.has(id),
+    clearCancelled: (id) => cancelledSessions.delete(id),
+  });
 }

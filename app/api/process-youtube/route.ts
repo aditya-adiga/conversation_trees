@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { processYouTube } from "@/lib/services/youtubeService";
+import { CHUNK_PRESETS, type ChunkPreset } from "@/lib/constants/chunking";
 
 export async function POST(request: Request) {
   try {
@@ -9,9 +10,14 @@ export async function POST(request: Request) {
       return Response.json({ error: "url is required" }, { status: 400 });
     }
 
+    const chunkPreset: ChunkPreset =
+      typeof body?.chunkPreset === "string" && body.chunkPreset in CHUNK_PRESETS
+        ? (body.chunkPreset as ChunkPreset)
+        : "long";
+
     const botId = randomUUID();
 
-    processYouTube(body.url.trim(), botId).catch((e) => {
+    processYouTube(body.url.trim(), botId, chunkPreset).catch((e) => {
       console.error(`[YouTube:${botId}] Processing failed:`, e);
     });
 
