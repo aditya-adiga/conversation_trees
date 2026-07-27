@@ -1,5 +1,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import { POST } from "../route";
+import { emitter } from "@/lib/emitter/emitter";
+import { clearCurrentBot } from "@/lib/db/streamSessions";
 
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/recall/create-bot", {
@@ -10,6 +12,11 @@ function makeRequest(body: unknown) {
 }
 
 const MEETING_URL = "https://meet.google.com/abc-defg-hij";
+const CLIENT_SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const validBody = {
+  url: MEETING_URL,
+  clientSessionId: CLIENT_SESSION_ID,
+};
 
 describe("POST /api/recall/create-bot", () => {
   beforeEach(() => {
@@ -20,8 +27,10 @@ describe("POST /api/recall/create-bot", () => {
   });
 
   afterEach(() => {
+    clearCurrentBot(CLIENT_SESSION_ID);
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("returns 201 with a bot object containing an id", async () => {
@@ -34,7 +43,7 @@ describe("POST /api/recall/create-bot", () => {
       }),
     );
 
-    const res = await POST(makeRequest({ url: MEETING_URL }));
+    const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.id).toBeDefined();
@@ -49,7 +58,7 @@ describe("POST /api/recall/create-bot", () => {
       }),
     );
 
-    const res = await POST(makeRequest({ url: MEETING_URL }));
+    const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "Bad request" });
   });
@@ -63,8 +72,47 @@ describe("POST /api/recall/create-bot", () => {
       }),
     );
 
-    const res = await POST(makeRequest({ url: MEETING_URL }));
+    const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "Bad request" });
+  });
+
+  it("returns 400 when clientSessionId is missing", async () => {
+    const res = await POST(makeRequest({ url: MEETING_URL }));
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid request body" });
+  });
+
+  it("closes the previous stream for the same client session", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/leave_call/")) {
+        return Promise.resolve({ ok: true, status: 200 });
+      }
+
+      const id =
+        fetchMock.mock.calls.filter(([calledUrl]) =>
+          String(calledUrl).includes("/api/v1/bot"),
+        ).length === 1
+          ? "old-bot-id"
+          : "new-bot-id";
+
+      return Promise.resolve({
+        status: 201,
+        json: async () => ({ id, status: "ready" }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const emitSpy = vi.spyOn(emitter, "emit");
+
+    await POST(makeRequest(validBody));
+    await POST(makeRequest(validBody));
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    expect(emitSpy).toHaveBeenCalledWith("old-bot-id:close");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://us-west-2.recall.ai/api/v1/bot/old-bot-id/leave_call/",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 });

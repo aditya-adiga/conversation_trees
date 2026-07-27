@@ -4,6 +4,8 @@ import { flush, update } from "../db/eventQueue";
 export function flushQueue(botId: string) {
   const queueData = flush(botId);
 
+  console.log(`[Queue:${botId}] flushing ${queueData?.length ?? 0} event(s)`);
+
   if (!queueData?.length) {
     return;
   }
@@ -14,5 +16,6 @@ export function flushQueue(botId: string) {
 }
 
 export function updateQueue(botId: string, payload: unknown) {
+  console.log(`[Queue:${botId}] queued event`);
   update(botId, payload);
 }

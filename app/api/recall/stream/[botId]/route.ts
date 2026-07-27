@@ -1,6 +1,7 @@
 import { emitter } from "@/lib/emitter/emitter";
 import { flushQueue } from "@/lib/services/eventsQueueProcessor";
 import { registerConnection, unregisterConnection } from "@/lib/db/eventQueue";
+import { stopRecallBot } from "@/lib/services/recallBotService";
 
 export async function GET(
   request: Request,
@@ -47,6 +48,14 @@ export async function GET(
         emitter.off(botId, listener);
         emitter.off(`${botId}:close`, closeListener);
         controller.close();
+
+        stopRecallBot(botId).then((result) => {
+          if (result.ok) {
+            console.log(`[SSE:${botId}] Bot removed from call after client disconnect`);
+          } else {
+            console.warn(`[SSE:${botId}] stopRecallBot failed: ${result.error}`);
+          }
+        });
       });
     },
   });

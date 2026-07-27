@@ -1,5 +1,12 @@
-const eventQueue = new Map<string, unknown[]>();
-const activeConnections = new Set<string>();
+const globalForEvents = globalThis as typeof globalThis & {
+  __conversationTreeEventQueue?: Map<string, unknown[]>;
+  __conversationTreeActiveConnections?: Set<string>;
+};
+
+const eventQueue =
+  globalForEvents.__conversationTreeEventQueue ??= new Map<string, unknown[]>();
+const activeConnections =
+  globalForEvents.__conversationTreeActiveConnections ??= new Set<string>();
 
 export function registerConnection(botId: string) {
   activeConnections.add(botId);

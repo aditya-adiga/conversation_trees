@@ -81,4 +81,5 @@ export const BotCreationSchema = z.object({
 
 export const CreateBotRequestSchema = z.object({
   url: z.url(),
+  clientSessionId: z.uuid(),
 });
