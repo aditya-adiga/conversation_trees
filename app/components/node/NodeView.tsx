@@ -1,11 +1,12 @@
 "use client";
 
+import { OPACITY } from "@/lib/constants/layout";
 import { useNavigation } from "@/lib/context/NavigationContext";
-import { getChildren, getAllSiblingIds, getSiblings } from "@/lib/utils/nodeUtils";
+import { useSwipe } from "@/lib/hooks/useSwipe";
+import { getAllSiblingIds, getChildren, getSiblings } from "@/lib/utils/nodeUtils";
 import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
 import { useEffect, useMemo, useRef } from "react";
-import { useSwipe } from "@/lib/hooks/useSwipe";
 import NeighbourCard from "./NeighbourCard";
 
 export default function NodeView() {
@@ -129,7 +130,7 @@ export default function NodeView() {
 							node={parent}
 							direction="parent"
 							onClick={() => navigate(parent.id)}
-							opacity={0.6}
+							opacity={OPACITY.PARENT}
 							isLatest={parent.id === latestNodeId}
 						/>
 					</div>
@@ -156,7 +157,7 @@ export default function NodeView() {
 
 				{/* Current node */}
 				<div className="flex w-full flex-col items-center justify-center">
-					<div className={`w-full max-w-2xl rounded-2xl border p-6 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)] sm:p-10 ${node.id === latestNodeId ? "border-[var(--latest)] bg-[var(--latest-bg)]" : "border-[var(--border)] bg-white"}`}>
+					<div className={`w-full max-w-2xl rounded-2xl border p-6 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)] sm:p-10 ${node.id === latestNodeId ? "border-[var(--latest)] bg-[var(--latest-bg)]" : "border-[var(--border)] bg-[var(--card)]"}`}>
 						<div className="mb-4 flex items-start gap-3">
 							<h2 className="flex-1 font-serif text-xl font-semibold tracking-tight text-[var(--text-heading)] sm:text-2xl">
 								{node.summary || "Untitled"}
@@ -181,7 +182,6 @@ export default function NodeView() {
 							{node.content}
 						</p>
 					</div>
-
 				</div>
 
 				{/* Siblings after — desktop only */}
