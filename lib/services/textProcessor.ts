@@ -7,10 +7,8 @@ import {
   forceFlush,
   drainAndCleanup,
 } from "@/lib/services/windowBuffer";
+import { CHUNK_PRESETS, type ChunkPreset } from "@/lib/constants/chunking";
 import type { TranscriptDataEvent } from "@/lib/types/event";
-
-// Match the streaming path: each chunk is ~100 words, window fires at 12 chunks
-const WORDS_PER_CHUNK = 100;
 
 function dispatch(botId: string, payload: unknown) {
   if (isConnected(botId)) {
@@ -46,12 +44,17 @@ function makeChunkEvent(botId: string, words: string[], now: string): Transcript
   };
 }
 
-export async function processTextAsync(botId: string, text: string) {
+export async function processTextAsync(
+  botId: string,
+  text: string,
+  chunkPreset: ChunkPreset = "long",
+) {
   const now = new Date().toISOString();
   const words = text.split(/\s+/).filter(Boolean);
+  const wordsPerChunk = CHUNK_PRESETS[chunkPreset].wordsPerChunk;
 
-  for (let i = 0; i < words.length; i += WORDS_PER_CHUNK) {
-    const chunk = words.slice(i, i + WORDS_PER_CHUNK);
+  for (let i = 0; i < words.length; i += wordsPerChunk) {
+    const chunk = words.slice(i, i + wordsPerChunk);
     accumulate(botId, makeChunkEvent(botId, chunk, now));
     const nodes = await processWindow(botId);
     if (nodes) {

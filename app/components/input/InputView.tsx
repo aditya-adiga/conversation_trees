@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import {
+	CHUNK_PRESETS,
+	recommendChunkPreset,
+	type ChunkPreset,
+} from "@/lib/constants/chunking";
 
 type Tab = "url" | "youtube" | "text";
 
 export type InputPayload =
 	| { type: "url"; url: string }
 	| { type: "youtube"; url: string }
-	| { type: "text"; text: string };
+	| { type: "text"; text: string; chunkPreset: ChunkPreset };
 
 interface InputViewProps {
 	onSubmit: (input: InputPayload) => void;
@@ -26,8 +31,11 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 	const [url, setUrl] = useState("");
 	const [youtubeUrl, setYoutubeUrl] = useState("");
 	const [text, setText] = useState("");
+	const [chunkPresetOverride, setChunkPresetOverride] = useState<ChunkPreset | null>(null);
 
 	const isLoading = status === "connecting";
+	const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+	const chunkPreset = chunkPresetOverride ?? recommendChunkPreset(wordCount);
 
 	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
@@ -36,7 +44,7 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 		} else if (tab === "youtube") {
 			onSubmit({ type: "youtube", url: youtubeUrl.trim() });
 		} else {
-			onSubmit({ type: "text", text: text.trim() });
+			onSubmit({ type: "text", text: text.trim(), chunkPreset });
 		}
 	}
 
@@ -90,14 +98,41 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 							className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
 						/>
 					) : (
-						<textarea
-							placeholder="Paste your transcript or conversation here…"
-							value={text}
-							onChange={(e) => setText(e.target.value)}
-							required
-							rows={8}
-							className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
-						/>
+						<>
+							<textarea
+								placeholder="Paste your transcript or conversation here…"
+								value={text}
+								onChange={(e) => setText(e.target.value)}
+								required
+								rows={8}
+								className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
+							/>
+							<div>
+								<p className="mb-1.5 text-xs text-[var(--text-muted)]">
+									Node granularity
+								</p>
+								<div className="flex gap-1 rounded-xl bg-[var(--background)] p-1">
+									{(Object.keys(CHUNK_PRESETS) as ChunkPreset[]).map((preset) => (
+										<button
+											key={preset}
+											type="button"
+											onClick={() => setChunkPresetOverride(preset)}
+											className={`flex-1 rounded-lg py-1.5 text-xs font-medium capitalize transition-all duration-150 ${
+												chunkPreset === preset
+													? "bg-[var(--card)] text-[var(--text-heading)] shadow-[var(--card-shadow)]"
+													: "text-[var(--text-muted)] hover:text-[var(--text-body)]"
+											}`}
+										>
+											{preset}
+										</button>
+									))}
+								</div>
+								<p className="mt-1.5 text-xs text-[var(--text-muted)]">
+									{CHUNK_PRESETS[chunkPreset].label}
+									{chunkPresetOverride === null && wordCount > 0 ? " (auto)" : ""}
+								</p>
+							</div>
+						</>
 					)}
 
 					{/* Error */}

@@ -42,8 +42,15 @@ export default function App() {
 		eventSourceRef.current = es;
 
 		es.onmessage = (e) => {
-			const data = JSON.parse(e.data);
-			if (data.node) addNode(data.node as CTNode);
+			let data: { node?: CTNode; eventData?: { event?: string } };
+			try {
+				data = JSON.parse(e.data);
+			} catch (err) {
+				console.error("Failed to parse SSE message", err, e.data);
+				return;
+			}
+
+			if (data.node) addNode(data.node);
 			if (
 				data.eventData?.event === "bot.done" ||
 				data.eventData?.event === "bot.fatal"
@@ -103,7 +110,7 @@ export default function App() {
 				const res = await fetch("/api/process-text", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ text: input.text }),
+					body: JSON.stringify({ text: input.text, chunkPreset: input.chunkPreset }),
 				});
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? "Failed to process text");
@@ -166,6 +173,7 @@ export default function App() {
 							isStopping={appState === "stopping"}
 							onHome={handleHome}
 							onStopBot={handleStopBot}
+							onOpenTranscript={() => setTranscriptPanelOpen(true)}
 						/>
 						{error && (
 							<div className="absolute left-1/2 top-20 z-50 -translate-x-1/2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm text-red-500 shadow-[var(--card-shadow)]">
