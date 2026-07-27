@@ -42,8 +42,15 @@ export default function App() {
 		eventSourceRef.current = es;
 
 		es.onmessage = (e) => {
-			const data = JSON.parse(e.data);
-			if (data.node) addNode(data.node as CTNode);
+			let data: { node?: CTNode; eventData?: { event?: string } };
+			try {
+				data = JSON.parse(e.data);
+			} catch (err) {
+				console.error("Failed to parse SSE message", err, e.data);
+				return;
+			}
+
+			if (data.node) addNode(data.node);
 			if (
 				data.eventData?.event === "bot.done" ||
 				data.eventData?.event === "bot.fatal"
