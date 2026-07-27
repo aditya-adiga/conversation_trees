@@ -1,7 +1,8 @@
 "use client";
 
+import { OPACITY } from "@/lib/constants/layout";
 import { useNavigation } from "@/lib/context/NavigationContext";
-import { getChildren, getAllSiblingIds, getSiblings } from "@/lib/utils/nodeUtils";
+import { getAllSiblingIds, getChildren, getSiblings } from "@/lib/utils/nodeUtils";
 import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
 import { useEffect, useMemo, useRef } from "react";
@@ -106,7 +107,7 @@ export default function NodeView() {
 							node={parent}
 							direction="parent"
 							onClick={() => navigate(parent.id)}
-							opacity={0.6}
+							opacity={OPACITY.PARENT}
 							isLatest={parent.id === latestNodeId}
 						/>
 					</div>
@@ -133,7 +134,7 @@ export default function NodeView() {
 
 				{/* Current node — center */}
 				<div className="flex h-full items-center justify-center">
-					<div className={`w-full max-w-2xl rounded-2xl border p-10 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)] ${node.id === latestNodeId ? "border-[var(--latest)] bg-[var(--latest-bg)]" : "border-[var(--border)] bg-white"}`}>
+					<div className={`w-full max-w-2xl rounded-2xl border p-10 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)] ${node.id === latestNodeId ? "border-[var(--latest)] bg-[var(--latest-bg)]" : "border-[var(--border)] bg-[var(--card)]"}`}>
 						<div className="mb-4 flex items-start gap-3">
 							<h2 className="flex-1 font-serif text-2xl font-semibold tracking-tight text-[var(--text-heading)]">
 								{node.summary || "Untitled"}
