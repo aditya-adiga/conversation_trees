@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Lora } from "next/font/google";
-import Minimap from "./components/Minimap";
+import Minimap from "./components/minimap/Minimap";
 import "./globals.css";
 
 const geistSans = Geist({

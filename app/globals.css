@@ -1,16 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f2f0eb;
+  --background: #e8ede5;
   --foreground: #2c2c2c;
   --card: #ffffff;
-  --card-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --card-hover-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  --card-progress: #E8F5E9;
+  --text-heading: #1a1a1a;
+  --text-body: #4a4a4a;
+  --text-muted: #8a8a8a;
+  --border: #e8e5e0;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-progress: var(--card-progress);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-lora);
