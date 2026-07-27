@@ -55,8 +55,9 @@ function makeChunk(words: string[], botId = "bot-1"): TranscriptDataEvent {
 }
 
 type LLMNode = {
+  name: string;
   content: string;
-  summary: string;
+  transcript: string;
   parentId: string | null;
   parentBatchIndex?: number | null;
 };
@@ -201,8 +202,9 @@ describe("windowBuffer", () => {
     it("should create a node when LLM returns generated status", async () => {
       accumulateChunks();
       const nodePayload = {
+        name: "Architecture discussion",
         content: "discussing architecture",
-        summary: "Architecture discussion",
+        transcript: "we were discussing architecture",
         parentId: null,
       };
       mockedSend.mockResolvedValueOnce(
@@ -230,14 +232,15 @@ describe("windowBuffer", () => {
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse(
           "generated",
-          [{ content: "first batch", summary: "First node", parentId: null }],
+          [{ name: "First node", content: "first batch", transcript: "first batch verbatim", parentId: null }],
           MIN_CHUNKS_FOR_SEGMENTATION,
         ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
         id: "node-1",
+        name: "First node",
         content: "first batch",
-        summary: "First node",
+        transcript: "first batch verbatim",
         parentId: null,
         prevSiblingId: null,
         nextSiblingId: null,
@@ -271,14 +274,15 @@ describe("windowBuffer", () => {
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse(
           "generated",
-          [{ content: "chunk1 chunk2", summary: "First node", parentId: null }],
+          [{ name: "First node", content: "chunk1 chunk2", transcript: "chunk1 chunk2", parentId: null }],
           2,
         ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
         id: "node-1",
+        name: "First node",
         content: "chunk1 chunk2",
-        summary: "First node",
+        transcript: "chunk1 chunk2",
         parentId: null,
         prevSiblingId: null,
         nextSiblingId: null,
@@ -315,8 +319,8 @@ describe("windowBuffer", () => {
     it("should create multiple nodes when LLM returns more than one", async () => {
       accumulateChunks();
 
-      const nodeA = { content: "topic one", summary: "Topic A", parentId: null };
-      const nodeB = { content: "topic two", summary: "Topic B", parentId: null };
+      const nodeA = { name: "Topic A", content: "topic one", transcript: "topic one verbatim", parentId: null };
+      const nodeB = { name: "Topic B", content: "topic two", transcript: "topic two verbatim", parentId: null };
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse("generated", [nodeA, nodeB], MIN_CHUNKS_FOR_SEGMENTATION) as never,
       );
@@ -352,16 +356,17 @@ describe("windowBuffer", () => {
       accumulateChunks();
 
       const nodeSpecs = [
-        { content: "parent topic", summary: "Parent", parentId: null, parentBatchIndex: null },
-        { content: "child subtopic", summary: "Child", parentId: null, parentBatchIndex: 0 },
+        { name: "Parent", content: "parent topic", transcript: "parent topic verbatim", parentId: null, parentBatchIndex: null },
+        { name: "Child", content: "child subtopic", transcript: "child subtopic verbatim", parentId: null, parentBatchIndex: 0 },
       ];
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse("generated", nodeSpecs, MIN_CHUNKS_FOR_SEGMENTATION) as never,
       );
       const fakeParent = {
         id: "parent-id",
+        name: "Parent",
         content: "parent topic",
-        summary: "Parent",
+        transcript: "parent topic verbatim",
         parentId: null,
         prevSiblingId: null,
         nextSiblingId: null,
@@ -370,8 +375,9 @@ describe("windowBuffer", () => {
       };
       const fakeChild = {
         id: "child-id",
+        name: "Child",
         content: "child subtopic",
-        summary: "Child",
+        transcript: "child subtopic verbatim",
         parentId: "parent-id",
         prevSiblingId: null,
         nextSiblingId: null,
@@ -386,14 +392,16 @@ describe("windowBuffer", () => {
 
       expect(result).toEqual([fakeParent, fakeChild]);
       expect(mockedCreateNode).toHaveBeenNthCalledWith(1, {
+        name: "Parent",
         content: "parent topic",
-        summary: "Parent",
+        transcript: "parent topic verbatim",
         parentId: null,
       });
       // Second node's parentId is resolved to the first node's real ID
       expect(mockedCreateNode).toHaveBeenNthCalledWith(2, {
+        name: "Child",
         content: "child subtopic",
-        summary: "Child",
+        transcript: "child subtopic verbatim",
         parentId: "parent-id",
       });
     });
@@ -403,14 +411,15 @@ describe("windowBuffer", () => {
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse(
           "generated",
-          [{ content: "first topic", summary: "Topic one", parentId: null }],
+          [{ name: "Topic one", content: "first topic", transcript: "first topic verbatim", parentId: null }],
           MIN_CHUNKS_FOR_SEGMENTATION,
         ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
         id: "node-aaa",
+        name: "Topic one",
         content: "first topic",
-        summary: "Topic one",
+        transcript: "first topic verbatim",
         parentId: null,
         prevSiblingId: null,
         nextSiblingId: null,
@@ -446,8 +455,9 @@ describe("windowBuffer", () => {
     it("should handle LLM response wrapped in markdown code fences", async () => {
       accumulateChunks();
       const nodePayload = {
+        name: "Greeting",
         content: "hello",
-        summary: "Greeting",
+        transcript: "hello verbatim",
         parentId: null,
       };
       mockedSend.mockResolvedValueOnce({
@@ -523,14 +533,15 @@ describe("windowBuffer", () => {
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse(
           "generated",
-          [{ content: "final words", summary: "Closing", parentId: null }],
+          [{ name: "Closing", content: "final words", transcript: "final words verbatim", parentId: null }],
           1,
         ) as never,
       );
       mockedCreateNode.mockReturnValueOnce({
         id: "forced-node",
+        name: "Closing",
         content: "final words",
-        summary: "Closing",
+        transcript: "final words verbatim",
         parentId: null,
         prevSiblingId: null,
         nextSiblingId: null,
@@ -558,14 +569,15 @@ describe("windowBuffer", () => {
       mockedSend.mockResolvedValueOnce(
         makeLLMResponse(
           "generated",
-          [{ content: "final words", summary: "Closing", parentId: null }],
+          [{ name: "Closing", content: "final words", transcript: "final words verbatim", parentId: null }],
           1,
         ) as never,
       );
       const fakeNode = {
         id: "forced-node",
+        name: "Closing",
         content: "final words",
-        summary: "Closing",
+        transcript: "final words verbatim",
         parentId: null,
         prevSiblingId: null,
         nextSiblingId: null,

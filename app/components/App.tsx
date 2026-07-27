@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigation } from "@/lib/context/NavigationContext";
 import NodeView from "./node/NodeView";
 import Minimap from "./minimap/Minimap";
+import TranscriptPanel from "./transcript/TranscriptPanel";
 import InputView, { type InputPayload } from "./input/InputView";
 import SessionControls from "./session/SessionControls";
 import WaitingForNodes from "./session/WaitingForNodes";
@@ -26,9 +27,10 @@ function getClientSessionId() {
 }
 
 export default function App() {
-	const { addNode, nodes, reset } = useNavigation();
+	const { addNode, nodes, currentNodeId, latestNodeId, navigate, reset } = useNavigation();
 	const [appState, setAppState] = useState<AppState>("idle");
 	const [botId, setBotId] = useState<string | null>(null);
+	const [transcriptPanelOpen, setTranscriptPanelOpen] = useState(false);
 	const [sessionSource, setSessionSource] = useState<SessionSource | null>(null);
 	const [error, setError] = useState<string | undefined>();
 	const eventSourceRef = useRef<EventSource | null>(null);
@@ -40,8 +42,15 @@ export default function App() {
 		eventSourceRef.current = es;
 
 		es.onmessage = (e) => {
-			const data = JSON.parse(e.data);
-			if (data.node) addNode(data.node as CTNode);
+			let data: { node?: CTNode; eventData?: { event?: string } };
+			try {
+				data = JSON.parse(e.data);
+			} catch (err) {
+				console.error("Failed to parse SSE message", err, e.data);
+				return;
+			}
+
+			if (data.node) addNode(data.node);
 			if (
 				data.eventData?.event === "bot.done" ||
 				data.eventData?.event === "bot.fatal"
@@ -92,7 +101,7 @@ export default function App() {
 				const res = await fetch("/api/process-text", {
 					method: "POST",
 					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify({ text: input.text }),
+					body: JSON.stringify({ text: input.text, chunkPreset: input.chunkPreset }),
 				});
 				const data = await res.json();
 				if (!res.ok) throw new Error(data.error ?? "Failed to process text");
@@ -133,28 +142,47 @@ export default function App() {
 
 	return (
 		<div className="relative h-full w-full">
-			<SessionControls
-				statusText={statusText}
-				showStopBot={sessionSource === "url"}
-				canStopBot={canStopBot}
-				isStopping={appState === "stopping"}
-				onHome={handleHome}
-				onStopBot={handleStopBot}
-			/>
-
-			{error && (
-				<div className="fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm text-red-500 shadow-[var(--card-shadow)]">
-					{error}
-				</div>
-			)}
-
 			{nodes.size === 0 ? (
-				<WaitingForNodes />
-			) : (
 				<>
-					<NodeView />
-					<Minimap />
+					<SessionControls
+						statusText={statusText}
+						showStopBot={sessionSource === "url"}
+						canStopBot={canStopBot}
+						isStopping={appState === "stopping"}
+						onHome={handleHome}
+						onStopBot={handleStopBot}
+					/>
+					<WaitingForNodes />
 				</>
+			) : (
+				<div className="flex h-full w-full overflow-hidden">
+					<div className="relative flex-1 overflow-hidden">
+						<SessionControls
+							statusText={statusText}
+							showStopBot={sessionSource === "url"}
+							canStopBot={canStopBot}
+							isStopping={appState === "stopping"}
+							onHome={handleHome}
+							onStopBot={handleStopBot}
+							onOpenTranscript={() => setTranscriptPanelOpen(true)}
+						/>
+						{error && (
+							<div className="absolute left-1/2 top-20 z-50 -translate-x-1/2 rounded-xl border border-red-100 bg-white px-4 py-2 text-sm text-red-500 shadow-[var(--card-shadow)]">
+								{error}
+							</div>
+						)}
+						<NodeView onOpenTranscript={() => setTranscriptPanelOpen(true)} />
+						<Minimap />
+					</div>
+					<TranscriptPanel
+						isOpen={transcriptPanelOpen}
+						nodes={nodes}
+						currentNodeId={currentNodeId}
+						latestNodeId={latestNodeId}
+						onNavigate={navigate}
+						onClose={() => setTranscriptPanelOpen(false)}
+					/>
+				</div>
 			)}
 		</div>
 	);

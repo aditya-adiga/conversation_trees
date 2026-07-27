@@ -7,6 +7,7 @@ interface SessionControlsProps {
   isStopping: boolean;
   onHome: () => void;
   onStopBot: () => void;
+  onOpenTranscript?: () => void;
 }
 
 export default function SessionControls({
@@ -16,9 +17,10 @@ export default function SessionControls({
   isStopping,
   onHome,
   onStopBot,
+  onOpenTranscript,
 }: SessionControlsProps) {
   return (
-    <div className="fixed left-4 right-4 top-4 z-50 flex items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-white/85 px-4 py-3 shadow-[var(--card-shadow)] backdrop-blur-sm">
+    <div className="absolute left-4 right-4 top-4 z-50 flex items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-white/85 px-4 py-3 shadow-[var(--card-shadow)] backdrop-blur-sm">
       <div className="flex min-w-0 items-center gap-3">
         <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-[var(--text-muted)]" />
         <p className="truncate text-sm text-[var(--text-body)]">{statusText}</p>
@@ -32,6 +34,15 @@ export default function SessionControls({
             className="rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isStopping ? "Stopping..." : "Stop bot"}
+          </button>
+        )}
+        {onOpenTranscript && (
+          <button
+            type="button"
+            onClick={onOpenTranscript}
+            className="rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-body)] transition-colors hover:bg-[var(--background)]"
+          >
+            Transcript
           </button>
         )}
         <button

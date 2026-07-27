@@ -123,20 +123,20 @@ describe("PUT /api/nodes/[id]", () => {
     expect(body.content).toBe("updated");
   });
 
-  it("should update summary field", async () => {
+  it("should update name field", async () => {
     const node = await createNode("content");
 
     const res = await PUT(
       createRequest("PUT", {
         ...node,
-        summary: "a summary",
+        name: "a name",
       }),
       withParams(node.id),
     );
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.summary).toBe("a summary");
+    expect(body.name).toBe("a name");
   });
 
   it("should return 404 for non-existent node", async () => {

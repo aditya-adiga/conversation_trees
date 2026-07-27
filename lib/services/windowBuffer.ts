@@ -61,8 +61,9 @@ const PROMPT = `
     "status": "generated/accumulating",
     "nodes": [
       {
-        "content": "Copy verbatim ALL words from every chunk this node covers, in order. Do not skip, paraphrase, or omit any words.",
-        "summary": "Short gist of the insight",
+        "name": "Short node title — 1 sentence naming the topic (used as the heading)",
+        "content": "Brief analytical summary of what was discussed and concluded — keep it concise.",
+        "transcript": "Copy verbatim ALL words from every chunk this node covers, in order. Do not skip, paraphrase, or omit any words.",
         "parentId": "UUID of an existing parent node, or null if this is the first node",
         "parentBatchIndex": null
       }
@@ -78,8 +79,9 @@ const FORCE_NOTE =
 const MIN_CHUNKS_FOR_SEGMENTATION = 12;
 
 const LLMNodeSchema = z.object({
+  name: z.string(),
   content: z.string(),
-  summary: z.string(),
+  transcript: z.string(),
   parentId: z.string().uuid().nullable(),
   parentBatchIndex: z.number().int().min(0).nullable().optional(),
 });
@@ -230,7 +232,7 @@ function buildTreeContext(nodes: BotBuffer["nodes"]): string {
 
   function render(parentId: string | null, indent: string) {
     for (const n of childrenMap.get(parentId) ?? []) {
-      lines.push(`${indent}[${n.id}] ${n.summary}`);
+      lines.push(`${indent}[${n.id}] ${n.name}`);
       render(n.id, `${indent}  `);
     }
   }
@@ -241,7 +243,7 @@ function buildTreeContext(nodes: BotBuffer["nodes"]): string {
   return (
     `\n\nCurrent conversation tree (indented = child of the node above it):` +
     `\n${lines.join("\n")}` +
-    `\n\nMost recently added node: [${last.id}] "${last.summary}"\n`
+    `\n\nMost recently added node: [${last.id}] "${last.name}"\n`
   );
 }
 
@@ -340,14 +342,16 @@ async function processWindowInner(
           : spec.parentId;
 
       const node = createNode({
+        name: spec.name,
         content: spec.content,
-        summary: spec.summary,
+        transcript: spec.transcript,
         parentId: resolvedParentId,
       });
       bufferNodes.push({
         id: node.id,
+        name: spec.name,
         content: spec.content,
-        summary: spec.summary,
+        transcript: spec.transcript,
         parentId: resolvedParentId,
       });
       createdNodes.push(node);

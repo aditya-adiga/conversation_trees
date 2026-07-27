@@ -56,8 +56,9 @@ export const TranscriptDataEventSchema = z.object({
 
 export const BufferNodeSchema = z.object({
   id: z.string().uuid(),
+  name: z.string(),
   content: z.string(),
-  summary: z.string(),
+  transcript: z.string(),
   parentId: z.string().uuid().nullable(),
 });
 

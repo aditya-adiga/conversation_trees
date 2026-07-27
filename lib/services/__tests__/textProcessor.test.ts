@@ -2,6 +2,7 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 
 vi.mock("@/lib/services/windowBuffer", () => ({
   accumulate: vi.fn(),
+  processWindow: vi.fn(),
   forceFlush: vi.fn(),
   drainAndCleanup: vi.fn(),
 }));
@@ -19,12 +20,13 @@ vi.mock("@/lib/services/eventsQueueProcessor", () => ({
 }));
 
 import { processTextAsync } from "../textProcessor";
-import { accumulate, forceFlush, drainAndCleanup } from "@/lib/services/windowBuffer";
+import { accumulate, processWindow, forceFlush, drainAndCleanup } from "@/lib/services/windowBuffer";
 import { emitter } from "@/lib/emitter/emitter";
 import { isConnected } from "@/lib/db/eventQueue";
 import { updateQueue } from "@/lib/services/eventsQueueProcessor";
 
 const mockedAccumulate = vi.mocked(accumulate);
+const mockedProcessWindow = vi.mocked(processWindow);
 const mockedForceFlush = vi.mocked(forceFlush);
 const mockedDrainAndCleanup = vi.mocked(drainAndCleanup);
 const mockedIsConnected = vi.mocked(isConnected);
@@ -37,7 +39,7 @@ function makeFakeNode(id: string) {
   return {
     id,
     content: "some content",
-    summary: "some summary",
+    name: "some name",
     parentId: null,
     prevSiblingId: null,
     nextSiblingId: null,
@@ -49,6 +51,7 @@ function makeFakeNode(id: string) {
 describe("processTextAsync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedProcessWindow.mockResolvedValue(undefined);
     mockedDrainAndCleanup.mockResolvedValue(undefined);
     mockedForceFlush.mockResolvedValue(undefined);
     mockedIsConnected.mockReturnValue(false);
@@ -82,17 +85,55 @@ describe("processTextAsync", () => {
     expect(words).toEqual(["word1", "word2", "word3"]);
   });
 
+  // ── Chunking ──────────────────────────────────────────────────────────────
+
+  it("splits text above 100 words into multiple chunks", async () => {
+    const words = Array.from({ length: 250 }, (_, i) => `word${i}`).join(" ");
+
+    await processTextAsync(BOT_ID, words);
+
+    // 250 words → chunks of 100, 100, 50 → 3 accumulate calls
+    expect(mockedAccumulate).toHaveBeenCalledTimes(3);
+    const firstChunk = mockedAccumulate.mock.calls[0][1].data.data.words;
+    const secondChunk = mockedAccumulate.mock.calls[1][1].data.data.words;
+    const thirdChunk = mockedAccumulate.mock.calls[2][1].data.data.words;
+    expect(firstChunk).toHaveLength(100);
+    expect(secondChunk).toHaveLength(100);
+    expect(thirdChunk).toHaveLength(50);
+  });
+
+  it("calls processWindow once per chunk", async () => {
+    const words = Array.from({ length: 200 }, (_, i) => `word${i}`).join(" ");
+
+    await processTextAsync(BOT_ID, words);
+
+    expect(mockedProcessWindow).toHaveBeenCalledTimes(2);
+    expect(mockedProcessWindow).toHaveBeenCalledWith(BOT_ID);
+  });
+
+  it("dispatches nodes returned by processWindow", async () => {
+    const fakeNode = makeFakeNode("node-from-window");
+    mockedProcessWindow.mockResolvedValueOnce([fakeNode] as never);
+    mockedIsConnected.mockReturnValue(true);
+
+    // Use enough words to trigger processWindow (short text still calls it once)
+    await processTextAsync(BOT_ID, "some text");
+
+    expect(mockedEmit).toHaveBeenCalledWith(BOT_ID, { node: fakeNode });
+  });
+
   // ── Pipeline ordering ─────────────────────────────────────────────────────
 
-  it("calls accumulate → forceFlush → drainAndCleanup in order", async () => {
+  it("calls accumulate → processWindow → forceFlush → drainAndCleanup in order", async () => {
     const callOrder: string[] = [];
     mockedAccumulate.mockImplementation(() => { callOrder.push("accumulate"); });
+    mockedProcessWindow.mockImplementation(async () => { callOrder.push("processWindow"); return undefined; });
     mockedForceFlush.mockImplementation(async () => { callOrder.push("forceFlush"); return undefined; });
     mockedDrainAndCleanup.mockImplementation(async () => { callOrder.push("drainAndCleanup"); });
 
     await processTextAsync(BOT_ID, "ordered test");
 
-    expect(callOrder).toEqual(["accumulate", "forceFlush", "drainAndCleanup"]);
+    expect(callOrder).toEqual(["accumulate", "processWindow", "forceFlush", "drainAndCleanup"]);
   });
 
   it("calls forceFlush with the correct botId", async () => {

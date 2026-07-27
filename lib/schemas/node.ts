@@ -2,8 +2,9 @@ import { z } from "zod";
 
 export const NodeSchema = z.object({
   id: z.uuid(),
+  name: z.string().optional(),
   content: z.string().min(1),
-  summary: z.string().optional(),
+  transcript: z.string().optional(),
   parentId: z.uuid().nullable(),
   nextSiblingId: z.uuid().nullable().default(null),
   prevSiblingId: z.uuid().nullable(),

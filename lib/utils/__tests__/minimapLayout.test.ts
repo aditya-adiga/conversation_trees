@@ -5,7 +5,6 @@ import type { CTNode } from "@/lib/types/node";
 function makeNode(overrides: Partial<CTNode> & { id: string }): CTNode {
 	return {
 		content: "content",
-		summary: "summary",
 		parentId: null,
 		prevSiblingId: null,
 		nextSiblingId: null,

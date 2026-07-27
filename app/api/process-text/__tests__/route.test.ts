@@ -115,7 +115,31 @@ describe("POST /api/process-text", () => {
     await flushPromises();
 
     expect(mockedProcessTextAsync).toHaveBeenCalledOnce();
-    expect(mockedProcessTextAsync).toHaveBeenCalledWith(botId, "hello world");
+    expect(mockedProcessTextAsync).toHaveBeenCalledWith(botId, "hello world", "long");
+  });
+
+  it("defaults chunkPreset to 'long' when not provided", async () => {
+    const res = await POST(makeRequest({ text: "hello world" }));
+    const { botId } = await res.json();
+    await flushPromises();
+
+    expect(mockedProcessTextAsync).toHaveBeenCalledWith(botId, "hello world", "long");
+  });
+
+  it("passes through a valid chunkPreset from the request body", async () => {
+    const res = await POST(makeRequest({ text: "hello world", chunkPreset: "short" }));
+    const { botId } = await res.json();
+    await flushPromises();
+
+    expect(mockedProcessTextAsync).toHaveBeenCalledWith(botId, "hello world", "short");
+  });
+
+  it("falls back to 'long' for an invalid chunkPreset", async () => {
+    const res = await POST(makeRequest({ text: "hello world", chunkPreset: "bogus" }));
+    const { botId } = await res.json();
+    await flushPromises();
+
+    expect(mockedProcessTextAsync).toHaveBeenCalledWith(botId, "hello world", "long");
   });
 
   it("does not crash the server when processTextAsync rejects", async () => {
