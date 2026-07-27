@@ -1,5 +1,6 @@
 "use client";
 
+import { OPACITY } from "@/lib/constants/layout";
 import type { CTNode } from "@/lib/types/node";
 
 type Direction = "parent" | "child" | "sibling";
@@ -21,14 +22,14 @@ export default function NeighbourCard({
 	node,
 	direction,
 	onClick,
-	opacity = 0.7,
+	opacity = OPACITY.DEFAULT_CARD,
 }: NeighbourCardProps) {
 	return (
 		<button
 			type="button"
 			onClick={onClick}
 			style={{ opacity }}
-			className="w-full cursor-pointer rounded-xl border border-[var(--border)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-all duration-200 hover:opacity-100 hover:shadow-[var(--card-hover-shadow)]"
+			className="w-full cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 text-left shadow-[var(--card-shadow)] transition-all duration-200 hover:opacity-100 hover:shadow-[var(--card-hover-shadow)]"
 		>
 			<div className="mb-1.5 flex items-center gap-1.5">
 				<span className="text-xs text-[var(--text-muted)]">

@@ -171,14 +171,16 @@ describe("ClientNodeSchema", () => {
     const result = ClientNodeSchema.safeParse({
       content: "hello",
       parentId: null,
-      summary: "should be stripped",
+      summary: "should be kept",
       nextSiblingId: null,
+      prevSiblingId: null,
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect("summary" in result.data).toBe(false);
+      expect("summary" in result.data).toBe(true);
       expect("nextSiblingId" in result.data).toBe(false);
+      expect("prevSiblingId" in result.data).toBe(false);
     }
   });
 });
