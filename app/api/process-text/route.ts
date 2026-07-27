@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { processTextAsync } from "@/lib/services/textProcessor";
+import { CHUNK_PRESETS, type ChunkPreset } from "@/lib/constants/chunking";
 
 export async function POST(request: Request) {
   try {
@@ -9,9 +10,14 @@ export async function POST(request: Request) {
       return Response.json({ error: "text is required" }, { status: 400 });
     }
 
+    const chunkPreset: ChunkPreset =
+      typeof body?.chunkPreset === "string" && body.chunkPreset in CHUNK_PRESETS
+        ? (body.chunkPreset as ChunkPreset)
+        : "long";
+
     const botId = randomUUID();
 
-    processTextAsync(botId, body.text.trim()).catch((e) => {
+    processTextAsync(botId, body.text.trim(), chunkPreset).catch((e) => {
       console.error(`[ProcessText:${botId}] Unhandled error`, e);
     });
 
