@@ -6,31 +6,16 @@ import {
 	getChildren,
 	getNode,
 	getSiblings,
-	ROOT_NODE_ID,
-} from "@/lib/data/dummyTree";
+} from "@/lib/data/dummyTreeLarge";
+import { useNavigation } from "@/lib/context/NavigationContext";
+import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import CurrentNodeCard from "./CurrentNodeCard";
 import NeighbourCard from "./NeighbourCard";
 
-function siblingOpacity(distance: number): number {
-	if (distance === 1) return OPACITY.SIBLING.NEAR;
-	if (distance === 2) return OPACITY.SIBLING.MEDIUM;
-	return OPACITY.SIBLING.FAR;
-}
-
-function childOpacity(index: number, total: number): number {
-	const center = (total - 1) / 2;
-	const dist = Math.abs(index - center);
-	const maxDist = Math.max(center, 1);
-	return Math.max(
-		OPACITY.CHILD.MIN,
-		OPACITY.CHILD.MAX - (dist / maxDist) * OPACITY.CHILD.SPREAD,
-	);
-}
-
 export default function NodeView() {
-	const [currentNodeId, setCurrentNodeId] = useState(ROOT_NODE_ID);
+	const { currentNodeId, navigate } = useNavigation();
 
 	const node = getNode(currentNodeId);
 	const parent = node?.parentId ? getNode(node.parentId) : undefined;
@@ -38,10 +23,6 @@ export default function NodeView() {
 	const children = node ? getChildren(node) : [];
 	const allSiblingIds = node ? getAllSiblingIds(node) : [];
 	const siblingIndex = node ? allSiblingIds.indexOf(node.id) : -1;
-
-	const navigate = useCallback((targetId: string | null | undefined) => {
-		if (targetId) setCurrentNodeId(targetId);
-	}, []);
 
 	useEffect(() => {
 		function handleKeyDown(e: KeyboardEvent) {
