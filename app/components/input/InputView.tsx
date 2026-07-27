@@ -7,10 +7,11 @@ import {
 	type ChunkPreset,
 } from "@/lib/constants/chunking";
 
-type Tab = "url" | "text";
+type Tab = "url" | "youtube" | "text";
 
 export type InputPayload =
 	| { type: "url"; url: string }
+	| { type: "youtube"; url: string; chunkPreset: ChunkPreset }
 	| { type: "text"; text: string; chunkPreset: ChunkPreset };
 
 interface InputViewProps {
@@ -21,23 +22,30 @@ interface InputViewProps {
 
 const tabLabel: Record<Tab, string> = {
 	url: "Google Meet",
+	youtube: "YouTube",
 	text: "Paste Text",
 };
 
 export default function InputView({ onSubmit, status, error }: InputViewProps) {
 	const [tab, setTab] = useState<Tab>("url");
 	const [url, setUrl] = useState("");
+	const [youtubeUrl, setYoutubeUrl] = useState("");
 	const [text, setText] = useState("");
 	const [chunkPresetOverride, setChunkPresetOverride] = useState<ChunkPreset | null>(null);
 
 	const isLoading = status === "connecting";
 	const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
-	const chunkPreset = chunkPresetOverride ?? recommendChunkPreset(wordCount);
+	// YouTube transcripts have no text to measure up front, so there's no auto
+	// recommendation for that tab — default to "medium" unless the user overrides.
+	const chunkPreset =
+		chunkPresetOverride ?? (tab === "text" ? recommendChunkPreset(wordCount) : "medium");
 
 	function handleSubmit(e: React.FormEvent) {
 		e.preventDefault();
 		if (tab === "url") {
 			onSubmit({ type: "url", url: url.trim() });
+		} else if (tab === "youtube") {
+			onSubmit({ type: "youtube", url: youtubeUrl.trim(), chunkPreset });
 		} else {
 			onSubmit({ type: "text", text: text.trim(), chunkPreset });
 		}
@@ -56,7 +64,7 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 
 				{/* Tab toggle */}
 				<div className="mb-6 flex gap-1 rounded-xl bg-[var(--background)] p-1">
-					{(["url", "text"] as Tab[]).map((t) => (
+					{(["url", "youtube", "text"] as Tab[]).map((t) => (
 						<button
 							key={t}
 							type="button"
@@ -83,42 +91,54 @@ export default function InputView({ onSubmit, status, error }: InputViewProps) {
 							required
 							className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
 						/>
+					) : tab === "youtube" ? (
+						<input
+							type="url"
+							placeholder="https://www.youtube.com/watch?v=..."
+							value={youtubeUrl}
+							onChange={(e) => setYoutubeUrl(e.target.value)}
+							required
+							className="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
+						/>
 					) : (
-						<>
-							<textarea
-								placeholder="Paste your transcript or conversation here…"
-								value={text}
-								onChange={(e) => setText(e.target.value)}
-								required
-								rows={8}
-								className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
-							/>
-							<div>
-								<p className="mb-1.5 text-xs text-[var(--text-muted)]">
-									Node granularity
-								</p>
-								<div className="flex gap-1 rounded-xl bg-[var(--background)] p-1">
-									{(Object.keys(CHUNK_PRESETS) as ChunkPreset[]).map((preset) => (
-										<button
-											key={preset}
-											type="button"
-											onClick={() => setChunkPresetOverride(preset)}
-											className={`flex-1 rounded-lg py-1.5 text-xs font-medium capitalize transition-all duration-150 ${
-												chunkPreset === preset
-													? "bg-[var(--card)] text-[var(--text-heading)] shadow-[var(--card-shadow)]"
-													: "text-[var(--text-muted)] hover:text-[var(--text-body)]"
-											}`}
-										>
-											{preset}
-										</button>
-									))}
-								</div>
-								<p className="mt-1.5 text-xs text-[var(--text-muted)]">
-									{CHUNK_PRESETS[chunkPreset].label}
-									{chunkPresetOverride === null && wordCount > 0 ? " (auto)" : ""}
-								</p>
+						<textarea
+							placeholder="Paste your transcript or conversation here…"
+							value={text}
+							onChange={(e) => setText(e.target.value)}
+							required
+							rows={8}
+							className="w-full resize-none rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm text-[var(--text-body)] outline-none placeholder:text-[var(--text-muted)] focus:border-[var(--text-muted)] focus:ring-0"
+						/>
+					)}
+
+					{tab !== "url" && (
+						<div>
+							<p className="mb-1.5 text-xs text-[var(--text-muted)]">
+								Node granularity
+							</p>
+							<div className="flex gap-1 rounded-xl bg-[var(--background)] p-1">
+								{(Object.keys(CHUNK_PRESETS) as ChunkPreset[]).map((preset) => (
+									<button
+										key={preset}
+										type="button"
+										onClick={() => setChunkPresetOverride(preset)}
+										className={`flex-1 rounded-lg py-1.5 text-xs font-medium capitalize transition-all duration-150 ${
+											chunkPreset === preset
+												? "bg-[var(--card)] text-[var(--text-heading)] shadow-[var(--card-shadow)]"
+												: "text-[var(--text-muted)] hover:text-[var(--text-body)]"
+										}`}
+									>
+										{preset}
+									</button>
+								))}
 							</div>
-						</>
+							<p className="mt-1.5 text-xs text-[var(--text-muted)]">
+								{CHUNK_PRESETS[chunkPreset].label}
+								{chunkPresetOverride === null && tab === "text" && wordCount > 0
+									? " (auto)"
+									: ""}
+							</p>
+						</div>
 					)}
 
 					{/* Error */}

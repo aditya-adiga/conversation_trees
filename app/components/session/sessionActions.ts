@@ -7,7 +7,7 @@ export type AppState =
   | "stopping"
   | "stopped"
   | "done";
-export type SessionSource = "url" | "text";
+export type SessionSource = "url" | "youtube" | "text";
 
 interface CreateSessionActionsArgs {
   appState: AppState;
@@ -44,10 +44,25 @@ export function createSessionActions({
   }
 
   async function handleStopBot() {
-    if (!botId || sessionSource !== "url") return;
+    if (!botId || (sessionSource !== "url" && sessionSource !== "youtube")) return;
 
     setError(undefined);
     setAppState("stopping");
+
+    if (sessionSource === "youtube") {
+      try {
+        await fetch("/api/process-youtube/stop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ botId }),
+        });
+      } catch {
+        // best-effort: cancel server-side, but close stream regardless
+      }
+      closeStream();
+      setAppState("stopped");
+      return;
+    }
 
     try {
       const res = await fetch("/api/recall/stop-bot", {
@@ -68,9 +83,11 @@ export function createSessionActions({
 
   const statusText =
     appState === "stopping"
-      ? "Politely escorting the bot out of the call..."
+      ? sessionSource === "youtube"
+        ? "Stopping transcript processing..."
+        : "Politely escorting the bot out of the call..."
       : appState === "stopped"
-        ? "Bot removed from the call."
+        ? "Stopped."
         : appState === "done"
           ? "Conversation complete."
           : nodeCount === 0
@@ -78,7 +95,7 @@ export function createSessionActions({
             : "Listening for more transcript...";
 
   const canStopBot =
-    sessionSource === "url" &&
+    (sessionSource === "url" || sessionSource === "youtube") &&
     !!botId &&
     appState !== "stopping" &&
     appState !== "stopped" &&
