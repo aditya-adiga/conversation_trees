@@ -56,44 +56,8 @@ export default function Minimap() {
 	if (layoutNodes.length === 0) return null;
 
 	return (
-		<div className="fixed bottom-4 right-4 z-50">
-			<div className="absolute -left-3 top-1/2 z-10 flex -translate-x-full -translate-y-1/2 flex-col overflow-hidden rounded-full border border-[var(--border)] bg-white/95 shadow-[var(--card-shadow)]">
-				<button
-					type="button"
-					onClick={() => {
-						setHasUserMoved(true);
-						zoomAroundPoint(zoom + ZOOM_STEP, viewport.center);
-					}}
-					className="px-2 py-1 text-xs text-[var(--text-heading)] hover:bg-[var(--latest-bg)]"
-					aria-label="Zoom minimap in"
-				>
-					+
-				</button>
-				<button
-					type="button"
-					onClick={() => {
-						setHasUserMoved(true);
-						zoomAroundPoint(zoom - ZOOM_STEP, viewport.center);
-					}}
-					className="border-y border-[var(--border)] px-2 py-1 text-xs text-[var(--text-heading)] hover:bg-[var(--latest-bg)]"
-					aria-label="Zoom minimap out"
-				>
-					-
-				</button>
-				<button
-					type="button"
-					onClick={() => {
-						setZoom(1);
-						setPan({ x: 0, y: 0 });
-						setHasUserMoved(false);
-					}}
-					className="px-2 py-1 text-xs text-[var(--text-heading)] hover:bg-[var(--latest-bg)]"
-					aria-label="Reset minimap view"
-				>
-					Reset
-				</button>
-			</div>
-			<div className="h-45 w-45 overflow-hidden rounded-full border border-[var(--border)] bg-white/90 shadow-lg backdrop-blur-sm">
+		<div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 flex flex-col items-center sm:left-auto sm:right-4 sm:block sm:translate-x-0">
+			<div className="h-40 w-40 overflow-hidden rounded-full border border-[var(--border)] bg-white/90 shadow-lg backdrop-blur-sm sm:h-45 sm:w-45">
 				<svg
 					ref={svgRef}
 					viewBox={viewBox}
@@ -235,6 +199,43 @@ export default function Minimap() {
 						})}
 					</g>
 				</svg>
+			</div>
+			{/* Zoom controls — horizontal below on mobile, vertical left on desktop */}
+			<div className="mt-2 flex overflow-hidden rounded-full border border-[var(--border)] bg-white/95 shadow-[var(--card-shadow)] sm:absolute sm:-left-3 sm:top-1/2 sm:mt-0 sm:-translate-x-full sm:-translate-y-1/2 sm:flex-col">
+				<button
+					type="button"
+					onClick={() => {
+						setHasUserMoved(true);
+						zoomAroundPoint(zoom + ZOOM_STEP, viewport.center);
+					}}
+					className="px-2 py-1 text-xs text-[var(--text-heading)] hover:bg-[var(--latest-bg)]"
+					aria-label="Zoom minimap in"
+				>
+					+
+				</button>
+				<button
+					type="button"
+					onClick={() => {
+						setHasUserMoved(true);
+						zoomAroundPoint(zoom - ZOOM_STEP, viewport.center);
+					}}
+					className="border-x border-[var(--border)] px-2 py-1 text-xs text-[var(--text-heading)] hover:bg-[var(--latest-bg)] sm:border-x-0 sm:border-y"
+					aria-label="Zoom minimap out"
+				>
+					-
+				</button>
+				<button
+					type="button"
+					onClick={() => {
+						setZoom(1);
+						setPan({ x: 0, y: 0 });
+						setHasUserMoved(false);
+					}}
+					className="px-2 py-1 text-xs text-[var(--text-heading)] hover:bg-[var(--latest-bg)]"
+					aria-label="Reset minimap view"
+				>
+					Reset
+				</button>
 			</div>
 		</div>
 	);
