@@ -1,9 +1,14 @@
-import NodeView from "./components/node/NodeView";
+"use client";
+
+import { NavigationProvider } from "@/lib/context/NavigationContext";
+import App from "./components/App";
 
 export default function Home() {
 	return (
-		<main className="relative h-screen w-screen overflow-hidden bg-[var(--background)]">
-			<NodeView />
-		</main>
+		<NavigationProvider>
+			<main className="relative h-screen w-screen overflow-hidden bg-[var(--background)]">
+				<App />
+			</main>
+		</NavigationProvider>
 	);
 }

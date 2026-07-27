@@ -1,28 +1,34 @@
 "use client";
 
 import { OPACITY } from "@/lib/constants/layout";
-import {
-	getAllSiblingIds,
-	getChildren,
-	getNode,
-	getSiblings,
-} from "@/lib/data/dummyTreeLarge";
 import { useNavigation } from "@/lib/context/NavigationContext";
+import { getAllSiblingIds, getChildren, getSiblings } from "@/lib/utils/nodeUtils";
 import { childOpacity, siblingOpacity } from "@/lib/utils/nodeView";
 import type { CTNode } from "@/lib/types/node";
-import { useEffect } from "react";
-import CurrentNodeCard from "./CurrentNodeCard";
+import { useEffect, useMemo, useRef } from "react";
 import NeighbourCard from "./NeighbourCard";
 
 export default function NodeView() {
-	const { currentNodeId, navigate } = useNavigation();
+	const { currentNodeId, latestNodeId, nodes, navigate } = useNavigation();
 
-	const node = getNode(currentNodeId);
-	const parent = node?.parentId ? getNode(node.parentId) : undefined;
-	const siblings = node ? getSiblings(node) : [];
-	const children = node ? getChildren(node) : [];
-	const allSiblingIds = node ? getAllSiblingIds(node) : [];
+	const node = currentNodeId ? nodes.get(currentNodeId) : undefined;
+	const parent = node?.parentId ? nodes.get(node.parentId) : undefined;
+	const siblings = node ? getSiblings(node, nodes) : [];
+	const children = node ? getChildren(node, nodes) : [];
+	const allSiblingIds = useMemo(
+		() => (node ? getAllSiblingIds(node, nodes) : []),
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[node?.id, nodes],
+	);
 	const siblingIndex = node ? allSiblingIds.indexOf(node.id) : -1;
+
+	const contentRef = useRef<HTMLParagraphElement>(null);
+
+	useEffect(() => {
+		if (contentRef.current) {
+			contentRef.current.scrollTop = 0;
+		}
+	}, [currentNodeId]);
 
 	useEffect(() => {
 		function handleKeyDown(e: KeyboardEvent) {
@@ -102,6 +108,7 @@ export default function NodeView() {
 							direction="parent"
 							onClick={() => navigate(parent.id)}
 							opacity={OPACITY.PARENT}
+							isLatest={parent.id === latestNodeId}
 						/>
 					</div>
 				) : (
@@ -120,13 +127,38 @@ export default function NodeView() {
 							direction="sibling"
 							onClick={() => navigate(s.id)}
 							opacity={siblingOpacity(distance)}
+							isLatest={s.id === latestNodeId}
 						/>
 					))}
 				</div>
 
 				{/* Current node — center */}
 				<div className="flex h-full items-center justify-center">
-					<CurrentNodeCard node={node} />
+					<div className={`w-full max-w-2xl rounded-2xl border p-10 shadow-[var(--card-shadow)] transition-shadow duration-300 hover:shadow-[var(--card-hover-shadow)] ${node.id === latestNodeId ? "border-[var(--latest)] bg-[var(--latest-bg)]" : "border-[var(--border)] bg-[var(--card)]"}`}>
+						<div className="mb-4 flex items-start gap-3">
+							<h2 className="flex-1 font-serif text-2xl font-semibold tracking-tight text-[var(--text-heading)]">
+								{node.summary || "Untitled"}
+							</h2>
+							{node.id === latestNodeId && (
+								<span className="mt-1.5 flex shrink-0 items-center gap-1 text-xs text-[var(--text-muted)]">
+									<span className="h-1.5 w-1.5 rounded-full bg-[var(--latest)] animate-pulse" />
+									new
+								</span>
+							)}
+							{latestNodeId && node.id !== latestNodeId && (
+								<button
+									type="button"
+									onClick={() => navigate(latestNodeId)}
+									className="mt-0.5 shrink-0 rounded-full border border-[var(--latest)] bg-[var(--latest-bg)] px-3 py-1 text-xs font-medium text-[var(--latest)] transition-colors hover:bg-white"
+								>
+									Jump to latest
+								</button>
+							)}
+						</div>
+					<p ref={contentRef} className="max-h-96 overflow-y-auto text-[15px] leading-relaxed text-[var(--text-body)]">
+						{node.content}
+					</p>
+					</div>
 				</div>
 
 				{/* Siblings after — stacked, nearest on top */}
@@ -138,6 +170,7 @@ export default function NodeView() {
 							direction="sibling"
 							onClick={() => navigate(s.id)}
 							opacity={siblingOpacity(distance)}
+							isLatest={s.id === latestNodeId}
 						/>
 					))}
 				</div>
@@ -154,6 +187,7 @@ export default function NodeView() {
 									direction="child"
 									onClick={() => navigate(child.id)}
 									opacity={childOpacity(i, children.length)}
+									isLatest={child.id === latestNodeId}
 								/>
 							</div>
 						))}
